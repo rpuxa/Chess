@@ -30,7 +30,6 @@ public class Game {
         while (true){
             System.out.println();
             int x1,x2,y1,y2;
-            board.numToMove((short)1324);
             System.out.println("Ждем хода...");
             Move.block = false;
             while (Move.to == null || Move.to[1] == null || !Move.block) {
@@ -49,7 +48,7 @@ public class Game {
             Move.updatePosition();
 
             long st = System.currentTimeMillis();
-            double num = AI.alphaBeta(new Board(board),0,4,-100000,100000);
+            double num = AI.alphaBeta(new Board(board),0,6,-100000,100000);
             long secondTime = System.currentTimeMillis() - st;
             System.out.println("Время на ход: " + secondTime);
 
@@ -357,6 +356,8 @@ class Board {
         final int costPawn = 100;
 
         switch (pos[x][y]) {
+            case 0:
+                return 0;
             case 1:
                 return costPawn;
             case 2:
@@ -384,7 +385,7 @@ class Board {
                 return -costQueen;
             case 15:
             case 16:
-                return -costKnight;
+                return -costKing;
         }
         return 0;
     }
@@ -448,23 +449,6 @@ class Board {
         return 0;
     }
 
-    boolean isMateTo(boolean white) {
-        boolean check = isCheckTo(white);
-        if (!check)
-            return false;
-
-        int[][] dK = {{0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}};
-
-        for (int x = 0; x < 8; x++)
-            for (int y = 0; y < 8; y++)
-                if ((pos[x][y] == ((white) ? 7 : 15) || pos[x][y] == ((white) ? 8 : 16))) {
-                    for (int[] dir : dK)
-                        if (!(!inBoard(x + dir[0], y + dir[1]) || pos[x + dir[0]][y + dir[1]] < 9 == white && pos[x + dir[0]][y + dir[1]] != 0 || attackedCell(white, x, y)))
-                            return false;
-                    return true;
-                }
-        return true;
-    }
 
     long getKey() {
         long hash = 0L;
