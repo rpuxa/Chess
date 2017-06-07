@@ -4,7 +4,7 @@ public class AI {
 
     static int scoreNow;
 
-    static int p = 0;
+    static int r = 2;
 
     static int Pawn[] =  {
             0,  0,  0,  0,  0,  0,  0,  0,
@@ -67,16 +67,20 @@ public class AI {
     //   static double bfs(Board board){
 
 
-    static int alphaBeta(Board board, int depth, int maxDepth, int alpha, int beta) {
+    static int alphaBeta(Board board, int depth, int maxDepth, int alpha, int beta, boolean nullMove) {
         int have = board.haveKing();
         if (have!=0)
-            return have;
+            return have + ((depth % 2 ==0) ? -depth+2:depth-2);
 
-        if (board.isCheckTo(depth%2==1) && maxDepth<6)
-            maxDepth+=2;
+        boolean isCheck = board.isCheckTo(depth%2==1);
+
+        if (!nullMove) {
+            if (isCheck && maxDepth < 6)
+                maxDepth += 2;
+        }
 
         if (depth >= maxDepth)
-            return evaluate(new Board(board));
+            return evaluate(new Board(board,false));
 
        ArrayList<short[]> sort = new ArrayList<>();
 
@@ -84,23 +88,26 @@ public class AI {
             int best = 0;
             int count = 0;
             for (short move : board.getMoves(false)) {
-                System.out.println(count);
-                int result = alphaBeta(Game.makeMove(new Board(board),move), depth + 1, maxDepth, alpha, beta);
+                System.out.print(count + " ");
+                int result = alphaBeta(Game.makeMove(new Board(board,false),move), depth + 1, maxDepth, alpha, beta,nullMove);
                 if (result < beta) {
                     sort.add(new short[]{(short)result,move});
                     beta = result;
-                    best = count;
+                    best = move;
                 }
                 count++;
             }
           historyHashing(-1,sort, board.getKey());
             scoreNow = beta;
+            System.out.println();
             return best;
         }
 
         if (depth % 2 == 0) {
+            if (!nullMove && !isCheck && alphaBeta(new Board(board,true),depth +1+r ,maxDepth,alpha,beta,true)<=alpha)
+                return alpha;
             for (short move : board.getMoves(false)) {
-                int result = alphaBeta(Game.makeMove(new Board(board),move), depth + 1, maxDepth, alpha, beta);
+                int result = alphaBeta(Game.makeMove(new Board(board,false),move), depth + 1, maxDepth, alpha, beta,nullMove);
                 if (result < beta) {
                     sort.add(new short[]{(short)result,move});
                     beta = result;
@@ -113,8 +120,10 @@ public class AI {
             historyHashing(1,sort, board.getKey());
             return beta;
         } else {
+            if (!nullMove && !isCheck && alphaBeta(new Board(board,true),depth +1+r ,maxDepth,alpha,beta,true)>=beta)
+                return beta;
             for (short move : board.getMoves(true)) {
-                int result = alphaBeta(Game.makeMove(new Board(board),move), depth + 1, maxDepth, alpha, beta);
+                int result = alphaBeta(Game.makeMove(new Board(board,false),move), depth + 1, maxDepth, alpha, beta,nullMove);
                 if (result > alpha) {
                     sort.add(new short[]{(short)result,move});
                     alpha = result;

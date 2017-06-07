@@ -19,11 +19,11 @@ class Move {
             else if (from == null)
                 from = new int[]{x,y};
             else {
-                if (board.pos[from[0]][from[1]]==1 && from[1]==6 && Math.abs(from[0]-x)<=1 && Game.makeLegalMove(new Board(board),from[0],from[1],x,6)) {
+                if (board.pos[from[0]][from[1]]==1 && from[1]==6 && Math.abs(from[0]-x)<=1 && Game.makeLegalMove(new Board(board,false),from[0],from[1],x,6)) {
                     new Chose().setVisible(true);
                     to = new Integer[]{x,null};
                 }
-                else if (Game.makeLegalMove(new Board(board),from[0],from[1],x,y)) {
+                else if (Game.makeLegalMove(new Board(board,false),from[0],from[1],x,y)) {
                     to = new Integer[]{x,y};
                     block =true;
                 }
