@@ -11,6 +11,7 @@ public class Game {
 
     public static void main(String[] args) throws InterruptedException {
         genZObristKeys();
+        Attack.calculating();
        byte[][] pos = {
                {2,1,0,0,0,0,9,10},
                {4,1,0,0,0,0,9,12},
@@ -24,6 +25,10 @@ public class Game {
        board = new Board(pos,(byte)-1);
        Move.board = new Board(board,false);
        new Gui().setVisible(true);
+       new Editor().setVisible(true);
+       Move.updatePosition();
+       while (!Edit.start)
+           Thread.sleep(100);
        start();
     }
 
@@ -51,8 +56,14 @@ public class Game {
                 JOptionPane.showMessageDialog(null, "Мат! Вы победили!");
                 break;
             }
+            Byte numP = AI.mDraw.get(board.getKey());
+            AI.mDraw.put(board.getKey(), (byte) ((numP == null) ? 1 : numP + 1));
+            if (AI.isDraw(AI.mDraw)){
+                JOptionPane.showMessageDialog(null, "3 кратное повторение позиции! Ничья!");
+                break;
+            }
             long st = System.currentTimeMillis();
-            int num = AI.alphaBeta(new Board(board,false),0,6,-100000,100000,false);
+            int num = AI.bfs(new Board(board,false),6);
             long secondTime = System.currentTimeMillis() - st;
             System.out.println("Время на ход: " + secondTime);
 
@@ -60,9 +71,15 @@ public class Game {
             Move.sounds("Sounds/blackTurn.wav");
             Move.board = new Board(board,false);
             Move.updatePosition();
-            System.out.println((double) AI.scoreNow/100);
+            System.out.println("Оценка: " + (double) AI.scoreNow/100);
             if (board.isCheckMateTo(true)){
                 JOptionPane.showMessageDialog(null, "Мат! Компьютер победил!");
+                break;
+            }
+            numP = AI.mDraw.get(board.getKey());
+            AI.mDraw.put(board.getKey(), (byte) ((numP == null) ? 1 : numP + 1));
+            if (AI.isDraw(AI.mDraw)){
+                JOptionPane.showMessageDialog(null, "3 кратное повторение позиции! Ничья!");
                 break;
             }
         }
@@ -81,11 +98,11 @@ public class Game {
     }
 
     static boolean makeLegalMove(Board board,short move2){
-        for (short move : board.getMoves(true))
+        for (short move : board.getMoves(true,false))
             if (move == move2){
                 makeMove(board,move);
                 boolean have = board.haveKing()==0;
-                ArrayList<Short> validMove = board.getMoves(false);
+                ArrayList<Short> validMove = board.getMoves(false,false);
                 makeMove(board,validMove.get(0));
                 return !(have && board.haveKing() != 0);
             }
@@ -103,11 +120,15 @@ public class Game {
         if (board.pos[x][y]==1 && y==6){
             board.pos[x][y]=0;
             board.pos[x1][7]=(byte)y1;
+            board.pawn = -1;
+            board.lastMove = (byte)(10*x1+y1);
             return board;
         }
         if (board.pos[x][y]==9 && y==1){
             board.pos[x][y]=0;
             board.pos[x1][0]=(byte)(y1+8);
+            board.pawn = -1;
+            board.lastMove = (byte)(10*x1+y1);
             return board;
         }
         //рокировка
@@ -117,12 +138,14 @@ public class Game {
                 board.pos[0][0]=0;
                 board.pos[2][0]=8;
                 board.pos[3][0]=3;
+                board.pawn = -1;
                 return board;
             }
             if (x1==6){
                 board.pos[7][0]=0;
                 board.pos[6][0]=8;
                 board.pos[5][0]=3;
+                board.pawn = -1;
                 return board;
             }
         }
@@ -132,12 +155,14 @@ public class Game {
                 board.pos[0][7]=0;
                 board.pos[2][7]=16;
                 board.pos[3][7]=11;
+                board.pawn = -1;
                 return board;
             }
             if (x1==6){
                 board.pos[7][7]=0;
                 board.pos[6][7]=16;
                 board.pos[5][7]=11;
+                board.pawn = -1;
                 return board;
             }
         }
@@ -150,10 +175,11 @@ public class Game {
                 board.pos[board.pawn][4]=0;
             }
             if (y==3){
-                board.pos[board.pawn][2]=1;
+                board.pos[board.pawn][2]=9;
                 board.pos[x][y]=0;
                 board.pos[board.pawn][3]=0;
             }
+            board.pawn = -1;
             return board;
         }
 
@@ -161,28 +187,38 @@ public class Game {
         if (board.pos[x][y]==2){
             board.pos[x][y]=0;
             board.pos[x1][y1]=3;
+            board.pawn = -1;
+            board.lastMove = (byte)(10*x1+y1);
             return board;
         }
         if (board.pos[x][y]==7){
             board.pos[x][y]=0;
             board.pos[x1][y1]=8;
+            board.pawn = -1;
+            board.lastMove = (byte)(10*x1+y1);
             return board;
         }
         if (board.pos[x][y]==10){
             board.pos[x][y]=0;
             board.pos[x1][y1]=11;
+            board.pawn = -1;
+            board.lastMove = (byte)(10*x1+y1);
             return board;
         }
         if (board.pos[x][y]==15){
             board.pos[x][y]=0;
             board.pos[x1][y1]=16;
+            board.pawn = -1;
+            board.lastMove = (byte)(10*x1+y1);
             return board;
         }
 
-        if (board.pos[x][y]==1 && y==1 && y1==3)
+        if ((board.pos[x][y]==1 && y==1 && y1==3) || (board.pos[x][y]==9 && y==6 && y1==4))
             board.pawn = (byte)x;
-        if (board.pos[x][y]==9 && y==6 && y1==4)
-            board.pawn = (byte)x;
+        else
+            board.pawn = -1;
+
+        board.lastMove = (byte)(10*x1+y1);
 
         board.pos[x1][y1]=board.pos[x][y];
         board.pos[x][y]=0;
@@ -211,9 +247,11 @@ class Board {
      */
     byte[][] pos;
     byte pawn;
+    byte lastMove;
 
     Board() {
         pos = new byte[8][8];
+        pawn = -1;
     }
 
     Board(byte[][] pos, byte pawn) {
@@ -228,10 +266,14 @@ class Board {
         for (int i = 0; i < 8; i++)
             pos[i] = board.pos[i].clone();
         if (!nullMove)
-        pawn = board.pawn;
+            pawn = board.pawn;
     }
 
-    ArrayList<Short> getMoves(boolean isTurnWhite) {
+    ArrayList<Short> getMoves(boolean isTurnWhite, boolean capture){
+        return getMoves(isTurnWhite,capture,null);
+    }
+
+    ArrayList<Short> getMoves(boolean isTurnWhite, boolean capture, int[] kill) {
         ArrayList<Short> validMoves = new ArrayList<>();
         for (byte x = 0; x < 8; x++)
             for (byte y = 0; y < 8; y++) {
@@ -248,8 +290,8 @@ class Board {
                                 else {
                                     validMoves.add((short)(1000*x + 100*y + 10*x + 6));
                                     validMoves.add((short)(1000*x + 100*y + 10*x + 5));
+                                    validMoves.add((short)(1000*x + 100*y + 10*x + 4));
                                     validMoves.add((short)(1000*x + 100*y + 10*x + 3));
-                                    validMoves.add((short)(1000*x + 100*y + 10*x + 2));
                                 }
                             }
                             if (inBoard(x + 1, y + ((isTurnWhite) ? 1 : -1)) && pos[x + 1][y + ((isTurnWhite) ? 1 : -1)] != 0 && pos[x + 1][y + ((isTurnWhite) ? 1 : -1)] > 8 == isTurnWhite) {
@@ -273,7 +315,7 @@ class Board {
                                     validMoves.add((short)(1000*x + 100*y + 10*(x-1) + 3));
                                 }
                             }
-                            if ((isTurnWhite && y==4) || (!isTurnWhite && y==3) && pawn!=-1 && Math.abs(x-pawn)==1)
+                            if (((isTurnWhite && y==4) || (!isTurnWhite && y==3)) && pawn!=-1 && Math.abs(x-pawn)==1)
                                 validMoves.add((short)(1000*x + 100*y + 10*pawn + 9));
                             break;
                         }
@@ -331,18 +373,50 @@ class Board {
                     }
                 }
             }
-        return sortMoves(validMoves);
+        if (capture && validMoves.size()>0){
+            ArrayList<Short> captures = new ArrayList<>();
+            for (Short validMove : validMoves) {
+                byte[] move = numToMove(validMove);
+                if (move[3] == 9 || pos[move[2]][move[3]] != 0)
+                    captures.add(validMove);
+                return sortMoves(captures,kill);
+            }
+        }
+        return sortMoves(validMoves,kill);
     }
 
-    ArrayList<Short> sortMoves(ArrayList<Short> moves) {
+    ArrayList<Short> sortMoves(ArrayList<Short> moves, int kill[]) {
+        if (kill != null)
+            for (int i = 1; i >= 0; i--)
+                if (moves.contains((short) kill[i])) {
+                    moves.remove(new Short((short) kill[i]));
+                    moves.add(0, (short) kill[i]);
+                }
+
+
         byte[][] k = new byte[moves.size()][2];
 
         int count = 0;
         for (short moveNum :
                 moves) {
             byte move[] = numToMove(moveNum);
-            if (move[3]==9){
+            if (move[3] == 9) {
                 k[count][0] = (byte) 39900;
+                k[count][1] = (byte) count;
+                count++;
+                continue;
+            }
+            if ((pos[move[0]][move[1]] == 1 && move[1] == 6) || (pos[move[0]][move[1]] == 9 && move[1] == 1)) {
+                int cost = 0;
+                if (move[3] == 3)
+                    cost = 500;
+                if (move[3] == 4)
+                    cost = 300;
+                if (move[3] == 5)
+                    cost = 320;
+                if (move[3] == 6)
+                    cost = 900;
+                k[count][0] = (byte) ((pos[move[2]][(((pos[move[0]][move[1]] == 1) ? 7 : 0))] == 0 ? cost : 400 * (cost + Math.abs(cost(move[2], move[3]))) - Math.abs(cost(move[0], move[1]))));
                 k[count][1] = (byte) count;
                 count++;
                 continue;
@@ -364,27 +438,34 @@ class Board {
             sort.add(moves.get(num[1]));
         }
 
+        if (lastMove != 0)
+            for (int i = sort.size() - 1; i >= 0; i--)
+                if (sort.get(i) % 100 == lastMove) {
+                    moves.add(0, moves.remove(i));
+                    break;
+                }
+
         short[] hash = AI.history.get(getKey());
 
         if (hash != null)
-        for (int i = hash.length-1; i >= 0; i--)
-            for (int j = sort.size()-1; j >= 0; j--)
-                if (hash[i] == sort.get(j)) {
-                    sort.add(0, sort.remove(j));
-                    break;
-                }
+            for (int i = hash.length - 1; i >= 0; i--)
+                for (int j = sort.size() - 1; j >= 0; j--)
+                    if (hash[i] == sort.get(j)) {
+                        sort.add(0, sort.remove(j));
+                        break;
+                    }
 
         return sort;
     }
 
-    boolean isCheckMateTo(boolean white){
-        ArrayList<Short> validMoves = getMoves(white);
-        if (isCheckTo(white)) {
+    boolean isCheckMateTo(boolean white, boolean paste){
+        ArrayList<Short> validMoves = getMoves(white,false);
+        if (isCheckTo(white)!=paste) {
             for (short move :
                     validMoves) {
                 Board board = new Board(pos, pawn);
                 board = Game.makeMove(board, move);
-                short move2 = board.getMoves(!white).get(0);
+                short move2 = board.getMoves(!white,false).get(0);
                 board = Game.makeMove(board,move2);
                 if (board.haveKing() == 0)
                     return false;
@@ -393,6 +474,9 @@ class Board {
         else
             return false;
         return true;
+    }
+    boolean isCheckMateTo(boolean white){
+        return isCheckMateTo(white,false);
     }
 
     byte[] numToMove(short number){
@@ -411,10 +495,10 @@ class Board {
     int cost(int x, int y) {
 
         final int costKing = 30000;
-        final int costQueen = 900;
-        final int costKnight = 300;
-        final int costBishop = 320;
-        final int costRook = 500;
+        final int costQueen = 1100;
+        final int costKnight = 400;
+        final int costBishop = 410;
+        final int costRook = 600;
         final int costPawn = 100;
 
         switch (pos[x][y]) {
