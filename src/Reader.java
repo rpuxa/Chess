@@ -2,7 +2,7 @@ import java.io.*;
 import java.util.*;
 
 public class Reader {
-
+/*
     static byte[][] pos = {
             {2, 1, 0, 0, 0, 0, 9, 10},
             {4, 1, 0, 0, 0, 0, 9, 12},
@@ -227,5 +227,5 @@ public class Reader {
         }
         return "";
     }
-
+*/
 }

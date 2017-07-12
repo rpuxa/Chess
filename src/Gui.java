@@ -18,30 +18,26 @@ public class Gui extends JFrame {
         setSize(640, 640);
 
         final int centerX = screenSize.width / 2, centerY = screenSize.height / 2;
-        setLocation(centerX - width / 2, centerY - height / 2);
+        setLocation(centerX - width / 2-100, centerY - height / 2-100);
 
         GridLayout layout = new GridLayout(8,8);
         setLayout(layout);
 
-        for (int i = 7; i >= 0; i--)
-            for (int j = 0; j < 8; ++j) {
-                final int i1 = i,j2 =j;
-                Move.buttons[j][i] = new JButton();
-                    Move.buttons[j][i].setAction(new AbstractAction() {
+        for (int i = 63; i >= 0; i--) {
+                final int i1 = i;
+                Move.buttons[i] = new JButton();
+                    Move.buttons[i].setAction(new AbstractAction() {
                         @Override
                         public void actionPerformed(ActionEvent e) {
-                            final int x = i1,y = j2;
-                                Move.change(x,y);
+                            final int i2 = i1;
+                                Move.change(i2);
                         }
                     });
-                add(Move.buttons[j][i]);
+                add(Move.buttons[i]);
             }
 
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         Move.updatePosition();
-    }
-
-    public static void main(String[] args) {
     }
 }
 
@@ -58,38 +54,37 @@ class Editor extends JFrame {
         setResizable(false);
 
         final int width = screenSize.width / 3, height = screenSize.height / 3;
-        setSize(width, width+80);
+        setSize(640, 640+2*80);
 
         final int centerX = screenSize.width / 2, centerY = screenSize.height / 2;
-        setLocation(centerX - width / 2, centerY - height / 2);
+        setLocation(centerX - width / 2-100, centerY - height / 2-100);
 
         GridLayout layout = new GridLayout(10,8);
         setLayout(layout);
 
-        for (int i = 7; i >= 0; i--)
-            for (int j = 0; j < 8; ++j) {
-                final int i1 = i,j2 =j;
-                Edit.buttons[i][j] = new JButton();
-                    Edit.buttons[i][j].setAction(new AbstractAction() {
+        for (int i = 63; i >= 0; i--) {
+                final int i1 = i;
+                Edit.buttons[i] = new JButton();
+                    Edit.buttons[i].setAction(new AbstractAction() {
                         @Override
                         public void actionPerformed(ActionEvent e) {
                             ImageIcon icon;
-                            final int x = i1,y = j2;
-                            if ((x+y) % 2 == 0)
+                            final int i2 = i1;
+                            if ((i2/8 + i2%8) % 2 == 1)
                                 icon = new ImageIcon("Icons/"+chose+"B.png");
                             else
                                 icon = new ImageIcon("Icons/"+chose+"W.png");
-                                Edit.buttons[x][y].setIcon(icon);
+                                Edit.buttons[i2].setIcon(icon);
                         }
                     });
-                add(Edit.buttons[i][j]);
-                if ((i+j) % 2 == 0){
+                add(Edit.buttons[i]);
+                if ((i/8 + i%8) % 2 == 1){
                     ImageIcon icon = new ImageIcon("Icons/_B.png");
-                    Edit.buttons[i][j].setIcon(icon);
+                    Edit.buttons[i].setIcon(icon);
                 }
                 else {
                     ImageIcon icon = new ImageIcon("Icons/_W.png");
-                    Edit.buttons[i][j].setIcon(icon);
+                    Edit.buttons[i].setIcon(icon);
                 }
             }
 
@@ -113,14 +108,13 @@ class Editor extends JFrame {
         clear.setAction(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                for (int i = 0; i < 8; i++)
-                    for (int j = 0; j < 8; j++) {
+                for (int i = 0; i < 64; i++) {
                     ImageIcon icon;
-                        if ((i + j) % 2 == 0)
+                        if ((i/8 + i%8) % 2 == 1)
                             icon = new ImageIcon("Icons/_B.png");
                         else
                             icon = new ImageIcon("Icons/_W.png");
-                        Edit.buttons[i][j].setIcon(icon);
+                        Edit.buttons[i].setIcon(icon);
                     }
             }
         });
@@ -131,32 +125,46 @@ class Editor extends JFrame {
         accept.setAction(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                byte[][] pos = new byte[8][8];
-                for (int i = 0; i < 8; i++)
-                    for (int j = 7; j >= 0; j--) {
-                        Icon icon = Edit.buttons[i][j].getIcon();
+                BitBoard bitBoard = new BitBoard(true);
+                for (int i = 0; i < 64; i++) {
+                        Icon icon = Edit.buttons[i].getIcon();
                         String name = icon.toString();
                         if (!Objects.equals(name, "Icons/_W.png") && !Objects.equals(name, "Icons/_B.png")) {
-                            byte black = 0;
-                            if (name.toCharArray()[6] == 'B')
-                                black = 8;
-                            if (name.toCharArray()[7] == 'P')
-                                pos[j][i] = (byte) (1 + black);
-                            if (name.toCharArray()[7] == 'R')
-                                pos[j][i] = (byte) (2 + black);
-                            if (name.toCharArray()[7] == 'N')
-                                pos[j][i] = (byte) (4 + black);
-                            if (name.toCharArray()[7] == 'B')
-                                pos[j][i] = (byte) (5 + black);
-                            if (name.toCharArray()[7] == 'Q')
-                                pos[j][i] = (byte) (6 + black);
-                            if (name.toCharArray()[7] == 'K')
-                                pos[j][i] = (byte) (7 + black);
+
+                            if (name.toCharArray()[6] == 'W') {
+                                if (name.toCharArray()[7] == 'P')
+                                    bitBoard.WHITE_PAWN |= 1L << i;
+                                if (name.toCharArray()[7] == 'R')
+                                    bitBoard.WHITE_ROOK |= 1L << i;
+                                if (name.toCharArray()[7] == 'N')
+                                    bitBoard.WHITE_KNIGHT |= 1L << i;
+                                if (name.toCharArray()[7] == 'B')
+                                    bitBoard.WHITE_BISHOP |= 1L << i;
+                                if (name.toCharArray()[7] == 'Q')
+                                    bitBoard.WHITE_QUEEN |= 1L << i;
+                                if (name.toCharArray()[7] == 'K')
+                                    bitBoard.WHITE_KING |= 1L << i;
+                            }
+                            else {
+                                if (name.toCharArray()[7] == 'P')
+                                    bitBoard.BLACK_PAWN |= 1L << i;
+                                if (name.toCharArray()[7] == 'R')
+                                    bitBoard.BLACK_ROOK |= 1L << i;
+                                if (name.toCharArray()[7] == 'N')
+                                    bitBoard.BLACK_KNIGHT |= 1L << i;
+                                if (name.toCharArray()[7] == 'B')
+                                    bitBoard.BLACK_BISHOP |= 1L << i;
+                                if (name.toCharArray()[7] == 'Q')
+                                    bitBoard.BLACK_QUEEN |= 1L << i;
+                                if (name.toCharArray()[7] == 'K')
+                                    bitBoard.BLACK_KING |= 1L << i;
+                            }
                         }
+
                     }
-                Board board = new Board(pos,(byte)-1);
-                Game.board = new Board(board,false);
-                Move.board = new Board(board,false);
+
+                Game.bitBoard = new BitBoard(bitBoard);
+                Move.bitBoard = new BitBoard(bitBoard);
                 Move.updatePosition();
             }
         });
@@ -219,28 +227,36 @@ class Chose extends JFrame {
         queen.setAction(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                Move.change(6,9);
+                Move.move = ((((((Move.from << 6) + Move.to) << 4) + Move.bitBoard.getFigure(Move.from)) << 3) + 1);
+                Move.block = true;
+                Move.clear();
                 setVisible(false);
             }
         });
         rook.setAction(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                Move.change(3,9);
+                Move.move = ((((((Move.from << 6) + Move.to) << 4) + Move.bitBoard.getFigure(Move.from)) << 3) + 2);
+                Move.block = true;
+                Move.clear();
                 setVisible(false);
             }
         });
         knight.setAction(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                Move.change(4,9);
+                Move.move = ((((((Move.from << 6) + Move.to) << 4) + Move.bitBoard.getFigure(Move.from)) << 3) + 3);
+                Move.block = true;
+                Move.clear();
                 setVisible(false);
             }
         });
         bishop.setAction(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                Move.change(5,9);
+                Move.move = ((((((Move.from << 6) + Move.to) << 4) + Move.bitBoard.getFigure(Move.from)) << 3) + 4);
+                Move.block = true;
+                Move.clear();
                 setVisible(false);
             }
         });
@@ -251,8 +267,8 @@ class Chose extends JFrame {
         rook.setIcon(new ImageIcon("Icons/WR_B.png"));
 
         add(queen);
-        add(knight);
         add(rook);
+        add(knight);
         add(bishop);
     }
 
@@ -262,5 +278,5 @@ class Chose extends JFrame {
 
 class Edit{
     static boolean start = false;
-    static JButton[][] buttons = new JButton[8][8];
+    static JButton[] buttons = new JButton[64];
 }

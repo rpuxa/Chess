@@ -1,29 +1,17 @@
 import javax.swing.*;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.Random;
 
 public class Game {
 
-    static Board board = new Board();
+    static BitBoard bitBoard = new BitBoard();
     static long[][] zKeys = new long[16][64];
 
     public static void main(String[] args) throws InterruptedException {
         genZObristKeys();
-        Attack.calculating();
-       byte[][] pos = {
-               {2,1,0,0,0,0,9,10},
-               {4,1,0,0,0,0,9,12},
-               {5,1,0,0,0,0,9,13},
-               {6,1,0,0,0,0,9,14},
-               {7,1,0,0,0,0,9,15},
-               {5,1,0,0,0,0,9,13},
-               {4,1,0,0,0,0,9,12},
-               {2,1,0,0,0,0,9,10}
-       };
-       board = new Board(pos,(byte)-1);
-       Move.board = new Board(board,false);
+        Mask.calculating();
+       bitBoard = new BitBoard();
+       Move.bitBoard = new BitBoard(bitBoard);
        new Gui().setVisible(true);
        new Editor().setVisible(true);
        Move.updatePosition();
@@ -35,572 +23,297 @@ public class Game {
     static void start() throws InterruptedException {
         while (true){
             System.out.println();
-            int x1,x2,y1,y2;
-            System.out.println("Ждем хода...");
+            int move;
             Move.block = false;
-            while (Move.to == null || Move.to[1] == null || !Move.block) {
+            while (!Move.block) {
                 Thread.sleep(100);
             }
-            System.out.println("Ходим...");
-            x1 = Move.from[0];
-            y1 = Move.from[1];
-            x2 = Move.to[0];
-            y2 = Move.to[1];
-            Move.from = null;
-            Move.to = null;
-            board = makeMove(new Board(board,false),x1,y1,x2,y2);
-            Move.sounds("Sounds/whiteTurn.wav");
-            Move.board = new Board(board,false);
-            Move.updatePosition();
-            if (board.isCheckMateTo(false)){
-                JOptionPane.showMessageDialog(null, "Мат! Вы победили!");
+            move = Move.move;
+            Move.move = null;
+            bitBoard = makeMove(new BitBoard(bitBoard),move);
+
+            if (checkEnd(false))
                 break;
-            }
-            Byte numP = AI.mDraw.get(board.getKey());
-            AI.mDraw.put(board.getKey(), (byte) ((numP == null) ? 1 : numP + 1));
-            if (AI.isDraw(AI.mDraw)){
-                JOptionPane.showMessageDialog(null, "3 кратное повторение позиции! Ничья!");
-                break;
-            }
+
             long st = System.currentTimeMillis();
-            int num = AI.bfs(new Board(board,false),6);
+
+            int num = AI.bfs(new BitBoard(bitBoard,false),6);
+
             long secondTime = System.currentTimeMillis() - st;
             System.out.println("Время на ход: " + secondTime);
 
-            board = makeMove(new Board(board,false),(short)num);
-            Move.sounds("Sounds/blackTurn.wav");
-            Move.board = new Board(board,false);
-            Move.updatePosition();
+            bitBoard = makeMove(new BitBoard(bitBoard),num);
+
+            if (checkEnd(true))
+                break;
+
             System.out.println("Оценка: " + (double) AI.scoreNow/100);
-            if (board.isCheckMateTo(true)){
-                JOptionPane.showMessageDialog(null, "Мат! Компьютер победил!");
-                break;
-            }
-            numP = AI.mDraw.get(board.getKey());
-            AI.mDraw.put(board.getKey(), (byte) ((numP == null) ? 1 : numP + 1));
-            if (AI.isDraw(AI.mDraw)){
-                JOptionPane.showMessageDialog(null, "3 кратное повторение позиции! Ничья!");
-                break;
-            }
         }
 
+    }
+
+    static boolean checkEnd(boolean white){
+        Move.sounds("Sounds/whiteTurn.wav");
+        Move.bitBoard = new BitBoard(bitBoard);
+        Move.updatePosition();
+        if (bitBoard.isCheckMateTo(false)){
+            JOptionPane.showMessageDialog(null, "Мат! Вы победили!");
+            return true;
+        }
+        if (bitBoard.isCheckMateTo(true)){
+            JOptionPane.showMessageDialog(null, "Мат! Компьютер победил!");
+            return true;
+        }
+        if (bitBoard.isPasteTo(white)){
+            JOptionPane.showMessageDialog(null, "Пат! Ничья!");
+            return true;
+        }
+        Byte numP = AI.mDraw.get(bitBoard.getKey());
+        AI.mDraw.put(bitBoard.getKey(), (byte) ((numP == null) ? 1 : numP + 1));
+        if (AI.isDraw(AI.mDraw)){
+            JOptionPane.showMessageDialog(null, "3 кратное повторение позиции! Ничья!");
+            return true;
+        }
+        return false;
     }
 
     static void genZObristKeys(){
         Random rand = new Random();
-        for (int i = 0; i < 16; i++)
+        for (int i = 0; i < 12; i++)
             for (int j = 0; j < 64; j++)
             zKeys[i][j] = rand.nextLong();
     }
 
-    static boolean makeLegalMove(Board board,int x,int y, int x1, int y1){
-        return makeLegalMove(board,board.moveToNum(new byte[]{(byte)x,(byte)y,(byte)x1,(byte)y1}));
-    }
-
-    static boolean makeLegalMove(Board board,short move2){
-        for (short move : board.getMoves(true,false))
-            if (move == move2){
-                makeMove(board,move);
-                boolean have = board.haveKing()==0;
-                ArrayList<Short> validMove = board.getMoves(false,false);
-                makeMove(board,validMove.get(0));
-                return !(have && board.haveKing() != 0);
-            }
+    static boolean makeLegalMove(BitBoard bitBoard,int move2){
+        try {
+            for (int move : bitBoard.getMoves(true, null))
+                if (move == move2) {
+                    makeMove(bitBoard, move);
+                    boolean have = bitBoard.WHITE_KING != 0;
+                    ArrayList<Integer> validMove = bitBoard.getMoves(false, null);
+                    makeMove(bitBoard, validMove.get(0));
+                    return have && bitBoard.WHITE_KING != 0;
+                }
+        }
+        catch (IndexOutOfBoundsException e){
+            return true;
+        }
         return false;
     }
 
-    static Board makeMove(Board board,short move){
-        byte[] moveArr = board.numToMove(move);
-        int x = moveArr[0],y = moveArr[1],x1 = moveArr[2],y1 = moveArr[3];
-        return makeMove(board,x,y,x1,y1);
+    static void kill(BitBoard bitBoard, boolean white, int to){
+        if (white){
+            bitBoard.WHITE_PAWN &= ~(1L << to);
+            bitBoard.WHITE_ROOK &= ~(1L << to);
+            bitBoard.WHITE_KNIGHT &= ~(1L << to);
+            bitBoard.WHITE_QUEEN &= ~(1L << to);
+            bitBoard.WHITE_KING &= ~(1L << to);
+            bitBoard.WHITE_BISHOP &= ~(1L << to);
+        }
+        else {
+            bitBoard.BLACK_PAWN &= ~(1L << to);
+            bitBoard.BLACK_ROOK &= ~(1L << to);
+            bitBoard.BLACK_KNIGHT &= ~(1L << to);
+            bitBoard.BLACK_QUEEN &= ~(1L << to);
+            bitBoard.BLACK_KING &= ~(1L << to);
+            bitBoard.BLACK_BISHOP &= ~(1L << to);
+        }
     }
 
-    static Board makeMove(Board board,int x,int y, int x1, int y1){
-        //превращение пешки
-        if (board.pos[x][y]==1 && y==6){
-            board.pos[x][y]=0;
-            board.pos[x1][7]=(byte)y1;
-            board.pawn = -1;
-            board.lastMove = (byte)(10*x1+y1);
-            return board;
+    static void update_rotated_bitboards(BitBoard bitBoard,int from, int to, Integer zeroing){
+        bitBoard.ALL ^= Mask.cell_default[from];
+        bitBoard.ALL_ROTATED_45_LEFT ^= Mask.cell_rotated_45_left[from];
+        bitBoard.ALL_ROTATED_45_RIGHT ^= Mask.cell_rotated_45_right[from];
+        bitBoard.ALL_ROTATED_90 ^= Mask.cell_rotated_90[from];
+        bitBoard.ALL |= Mask.cell_default[to];
+        bitBoard.ALL_ROTATED_45_LEFT |= Mask.cell_rotated_45_left[to];
+        bitBoard.ALL_ROTATED_45_RIGHT |= Mask.cell_rotated_45_right[to];
+        bitBoard.ALL_ROTATED_90 |= Mask.cell_rotated_90[to];
+        if (zeroing!=null) {
+            bitBoard.ALL &= ~(1L << Mask.cell_default[zeroing]);
+            bitBoard.ALL_ROTATED_45_LEFT &= ~(1L << Mask.cell_rotated_45_left[zeroing]);
+            bitBoard.ALL_ROTATED_45_RIGHT &= ~(1L << Mask.cell_rotated_45_right[zeroing]);
+            bitBoard.ALL_ROTATED_90 &= ~(1L << Mask.cell_rotated_90[zeroing]);
         }
-        if (board.pos[x][y]==9 && y==1){
-            board.pos[x][y]=0;
-            board.pos[x1][0]=(byte)(y1+8);
-            board.pawn = -1;
-            board.lastMove = (byte)(10*x1+y1);
-            return board;
+    }
+
+    static void update_rotated_bitboards_castling(BitBoard bitBoard,int n){
+        int castle[][] = {{3, 0},{3, 7},{59, 56},{59, 63}};
+            bitBoard.ALL ^= Mask.cell_default[castle[n][1]] | Mask.cell_default[castle[n][0]];
+            bitBoard.ALL_ROTATED_45_LEFT ^= Mask.cell_rotated_45_left[castle[n][1]]|  Mask.cell_rotated_45_left[castle[n][0]];
+            bitBoard.ALL_ROTATED_45_RIGHT ^= Mask.cell_rotated_45_right[castle[n][1]] | Mask.cell_rotated_45_right[castle[n][0]];
+            bitBoard.ALL_ROTATED_90 ^= Mask.cell_rotated_90[castle[n][1]] | Mask.cell_rotated_90[castle[n][0]];
+    }
+
+
+    static BitBoard makeMove(BitBoard bitBoard,int move){
+        int promotion = move & 7;
+        int figure =  15 & (move >> 3);
+        int from = move>>13, to = (move>>7) & 63;
+        boolean isTurnWhite = figure < 7;
+        //превращение пешки
+        if (promotion != 0) {
+            if (isTurnWhite) {
+                bitBoard.WHITE_PAWN &= ~(1L << from);
+                if (to / 8 == 3)
+                    bitBoard.WHITE_ROOK |= 1L << 56 + to % 8;
+                if (to / 8 == 4)
+                    bitBoard.WHITE_KNIGHT |= 1L << 56 + to % 8;
+                if (to / 8 == 5)
+                    bitBoard.WHITE_BISHOP |= 1L << 56 + to % 8;
+                if (to / 8 == 6)
+                    bitBoard.WHITE_QUEEN |= 1L << 56 + to % 8;
+                kill(bitBoard, false, 56 + to % 8);
+            } else {
+                bitBoard.BLACK_PAWN &= ~(1L << from);
+                if (to / 8 == 3)
+                    bitBoard.BLACK_ROOK |= 1L << to % 8;
+                if (to / 8 == 4)
+                    bitBoard.BLACK_KNIGHT |= 1L << to % 8;
+                if (to / 8 == 5)
+                    bitBoard.BLACK_BISHOP |= 1L << to % 8;
+                if (to / 8 == 6)
+                    bitBoard.BLACK_QUEEN |= 1L << to % 8;
+                kill(bitBoard, true, to % 8);
+            }
+            bitBoard.PASS = 0;
+            update_rotated_bitboards(bitBoard,from,to,null);
+            return bitBoard;
         }
         //рокировка
-        if (board.pos[x][y]==7 && Math.abs(x-x1)==2){
-            board.pos[x][y]=0;
-            if (x1==2){
-                board.pos[0][0]=0;
-                board.pos[2][0]=8;
-                board.pos[3][0]=3;
-                board.pawn = -1;
-                return board;
+        if (from==3 && figure == 6 && Math.abs(from-to)==2){
+            bitBoard.WHITE_KING &= ~(1L << from);
+            bitBoard.WHITE_KING |= 1L << to;
+            if (to==1) {
+                bitBoard.WHITE_ROOK ^= 0b101;
+                update_rotated_bitboards_castling(bitBoard, 0);
             }
-            if (x1==6){
-                board.pos[7][0]=0;
-                board.pos[6][0]=8;
-                board.pos[5][0]=3;
-                board.pawn = -1;
-                return board;
+            else {
+                bitBoard.WHITE_ROOK ^= 0b10010000;
+                update_rotated_bitboards_castling(bitBoard, 1);
             }
+            bitBoard.PASS = 0;
+            bitBoard.CASTLE &= ~(1L << 3);
+            bitBoard.CASTLE &= ~(1L << 2);
+            return bitBoard;
         }
-        if (board.pos[x][y]==15 && Math.abs(x-x1)==2){
-            board.pos[x][y]=0;
-            if (x1==2){
-                board.pos[0][7]=0;
-                board.pos[2][7]=16;
-                board.pos[3][7]=11;
-                board.pawn = -1;
-                return board;
+        if (from==59 && figure == 12 && Math.abs(from-to)==2){
+            bitBoard.BLACK_KING &= ~(1L << from);
+            bitBoard.BLACK_KING |= 1L << to;
+            if (to==57) {
+                bitBoard.BLACK_ROOK ^= 0b101 << 56;
+                update_rotated_bitboards_castling(bitBoard, 2);
             }
-            if (x1==6){
-                board.pos[7][7]=0;
-                board.pos[6][7]=16;
-                board.pos[5][7]=11;
-                board.pawn = -1;
-                return board;
+            else {
+                bitBoard.BLACK_ROOK ^= 0b10010000 << 56;
+                update_rotated_bitboards_castling(bitBoard, 3);
             }
+            bitBoard.PASS = 0;
+            bitBoard.CASTLE &= ~(1L << 1);
+            bitBoard.CASTLE &= ~1L;
+            return bitBoard;
         }
 
         //взятие на проходе
-        if (y1==9){
-            if (y==4){
-                board.pos[board.pawn][5]=1;
-                board.pos[x][y]=0;
-                board.pos[board.pawn][4]=0;
-            }
-            if (y==3){
-                board.pos[board.pawn][2]=9;
-                board.pos[x][y]=0;
-                board.pos[board.pawn][3]=0;
-            }
-            board.pawn = -1;
-            return board;
+        if (figure == 1 && ((bitBoard.PASS >> to) & 1) != 0){
+            bitBoard.WHITE_PAWN &= ~(1L << from);
+            bitBoard.WHITE_PAWN |= 1L << to;
+            bitBoard.BLACK_PAWN &= (~1L << to+8);
+            bitBoard.PASS = 0;
+            update_rotated_bitboards(bitBoard,from,to,to+8);
+            return bitBoard;
+        }
+        if (figure == 7 && ((bitBoard.PASS >> to) & 1) != 0){
+            bitBoard.BLACK_PAWN &= ~(1L << from);
+            bitBoard.BLACK_PAWN |= 1L << to;
+            bitBoard.WHITE_PAWN &= ~(1L << to-8);
+            bitBoard.PASS = 0;
+            update_rotated_bitboards(bitBoard,from,to,to-8);
+            return bitBoard;
         }
 
         //обычный ход
-        if (board.pos[x][y]==2){
-            board.pos[x][y]=0;
-            board.pos[x1][y1]=3;
-            board.pawn = -1;
-            board.lastMove = (byte)(10*x1+y1);
-            return board;
+        if (figure == 2){
+            if (from == 0)
+                bitBoard.CASTLE &= ~(1L << 3);
+            else if (from == 7)
+                bitBoard.CASTLE &= ~(1L << 2);
         }
-        if (board.pos[x][y]==7){
-            board.pos[x][y]=0;
-            board.pos[x1][y1]=8;
-            board.pawn = -1;
-            board.lastMove = (byte)(10*x1+y1);
-            return board;
-        }
-        if (board.pos[x][y]==10){
-            board.pos[x][y]=0;
-            board.pos[x1][y1]=11;
-            board.pawn = -1;
-            board.lastMove = (byte)(10*x1+y1);
-            return board;
-        }
-        if (board.pos[x][y]==15){
-            board.pos[x][y]=0;
-            board.pos[x1][y1]=16;
-            board.pawn = -1;
-            board.lastMove = (byte)(10*x1+y1);
-            return board;
+        if (figure == 6){
+            bitBoard.CASTLE &= ~(1L << 3);
+            bitBoard.CASTLE &= ~(1L << 2);
         }
 
-        if ((board.pos[x][y]==1 && y==1 && y1==3) || (board.pos[x][y]==9 && y==6 && y1==4))
-            board.pawn = (byte)x;
-        else
-            board.pawn = -1;
+        if (figure == 8){
+            if (from == 56)
+                bitBoard.CASTLE &= ~(1L << 1);
+            else if (from == 63)
+                bitBoard.CASTLE &= ~1L;
+        }
+        if (figure == 12){
+            bitBoard.CASTLE &= ~(1L << 1);
+            bitBoard.CASTLE &= ~1L;
+        }
 
-        board.lastMove = (byte)(10*x1+y1);
+        bitBoard.PASS = 0;
 
-        board.pos[x1][y1]=board.pos[x][y];
-        board.pos[x][y]=0;
-        return board;
-    }
-}
+        if (Math.abs(from-to)==16 && (from/8 == 6 && ((bitBoard.BLACK_PAWN >> from) & 1) != 0 || from/8 == 1 && (((bitBoard.WHITE_PAWN >> from) & 1) != 0)))
+            bitBoard.PASS |= 1L << (to - ((from/8 == 1) ? 8:-8));
 
-class Board {
-    /* 0 - нет фигуры
-       1 - белая пешка
-       2 - белая ладья (неходившая)
-       3 - белая ладья (ходившая)
-       4 - белый конь
-       5 - белый слон
-       6 - белый ферзь
-       7 - белый король (неходивший)
-       8 - белый король (ходивший)
-       9 - черная пешка
-       10 - черная ладья (неходившая)
-       11 - черная ладья (ходившая)
-       12 - черный конь
-       13 - черный слон
-       14 - черный ферзь
-       15 - черный король (неходивший)
-       16 - черный король ходивший
-     */
-    byte[][] pos;
-    byte pawn;
-    byte lastMove;
-
-    Board() {
-        pos = new byte[8][8];
-        pawn = -1;
-    }
-
-    Board(byte[][] pos, byte pawn) {
-        this.pos = new byte[8][8];
-        for (int i = 0; i < 8; i++)
-            this.pos[i] = pos[i].clone();
-        this.pawn = pawn;
-    }
-
-    Board(Board board, boolean nullMove) {
-        this.pos = new byte[8][8];
-        for (int i = 0; i < 8; i++)
-            pos[i] = board.pos[i].clone();
-        if (!nullMove)
-            pawn = board.pawn;
-    }
-
-    ArrayList<Short> getMoves(boolean isTurnWhite, boolean capture){
-        return getMoves(isTurnWhite,capture,null);
-    }
-
-    ArrayList<Short> getMoves(boolean isTurnWhite, boolean capture, int[] kill) {
-        ArrayList<Short> validMoves = new ArrayList<>();
-        for (byte x = 0; x < 8; x++)
-            for (byte y = 0; y < 8; y++) {
-                byte figure = pos[x][y];
-                if (figure > 0 && figure < 9 == isTurnWhite) {
-                    switch (figure) {
-                        case 1:
-                        case 9: {
-                            if (y == 1 && pos[x][y + 1] == 0 && pos[x][y + 2] == 0 && isTurnWhite || y == 6 && pos[x][y - 1] == 0 && pos[x][y - 2] == 0 && !isTurnWhite)
-                                validMoves.add((short)(1000*x + 100*y+10*x + y + ((isTurnWhite) ? 2 : -2)));
-                            if (pos[x][y + ((isTurnWhite) ? 1 : -1)] == 0) {
-                                if (y != ((isTurnWhite) ? 6 : 1))
-                                    validMoves.add((short)(1000*x + 100*y + 10*x + y + ((isTurnWhite) ? 1 : -1)));
-                                else {
-                                    validMoves.add((short)(1000*x + 100*y + 10*x + 6));
-                                    validMoves.add((short)(1000*x + 100*y + 10*x + 5));
-                                    validMoves.add((short)(1000*x + 100*y + 10*x + 4));
-                                    validMoves.add((short)(1000*x + 100*y + 10*x + 3));
-                                }
-                            }
-                            if (inBoard(x + 1, y + ((isTurnWhite) ? 1 : -1)) && pos[x + 1][y + ((isTurnWhite) ? 1 : -1)] != 0 && pos[x + 1][y + ((isTurnWhite) ? 1 : -1)] > 8 == isTurnWhite) {
-                                if (y != ((isTurnWhite) ? 6 : 1))
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x+1) + y + ((isTurnWhite) ? 1 : -1)));
-                                else {
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x+1) + 6));
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x+1) + 5));
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x+1) + 4));
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x+1) + 3));
-
-                                }
-                            }
-                            if (inBoard(x - 1, y + ((isTurnWhite) ? 1 : -1)) && pos[x - 1][y + ((isTurnWhite) ? 1 : -1)] != 0 && pos[x - 1][y + ((isTurnWhite) ? 1 : -1)] > 8 == isTurnWhite) {
-                                if (y != ((isTurnWhite) ? 6 : 1))
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x-1) + y + ((isTurnWhite) ? 1 : -1)));
-                                else {
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x-1) + 6));
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x-1) + 5));
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x-1) + 4));
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x-1) + 3));
-                                }
-                            }
-                            if (((isTurnWhite && y==4) || (!isTurnWhite && y==3)) && pawn!=-1 && Math.abs(x-pawn)==1)
-                                validMoves.add((short)(1000*x + 100*y + 10*pawn + 9));
-                            break;
-                        }
-                        case 2:
-                        case 3:
-                        case 5:
-                        case 6:
-                        case 10:
-                        case 11:
-                        case 13:
-                        case 14: {
-                            int[][] d;
-                            if (figure == 3 || figure == 2 || figure == 10 || figure == 11)
-                                d = new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-                            else if (figure == 13 || figure == 5)
-                                d = new int[][]{{1, 1}, {-1, -1}, {-1, 1}, {1, -1}};
-                            else
-                                d = new int[][]{{1, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-                            for (int[] dir :
-                                    d)
-                                for (int i = 1; i < 8; i++)
-                                    if (inBoard(x + i * dir[0], y + i * dir[1]) && pos[x + i * dir[0]][y + i * dir[1]] == 0)
-                                        validMoves.add((short)(1000*x + 100*y + 10*(x + i * dir[0]) + (y + i * dir[1])));
-                                    else {
-                                        if (inBoard(x + i * dir[0], y + i * dir[1]) && pos[x + i * dir[0]][y + i * dir[1]] > 8 == isTurnWhite)
-                                            validMoves.add((short)(1000*x + 100*y + 10*(x + i * dir[0]) + (y + i * dir[1])));
-                                        break;
-                                    }
-                            break;
-                        }
-                        case 4:
-                        case 12:
-                        case 7:
-                        case 8:
-                        case 15:
-                        case 16: {
-                            int[][] d;
-                            if (figure == 4 || figure == 12)
-                                d = new int[][]{{-1, 2}, {1, 2}, {2, -1}, {2, 1}, {-1, -2}, {1, -2}, {-2, -1}, {-2, 1}};
-                            else
-                                d = new int[][]{{0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}};
-                            for (int[] dir : d)
-                                if (inBoard(x + dir[0], y + dir[1]) && (pos[x + dir[0]][y + dir[1]] == 0 || pos[x + dir[0]][y + dir[1]] > 8 == isTurnWhite))
-                                    validMoves.add((short)(1000*x + 100*y + 10*(x + dir[0]) + (y + dir[1])));
-                            if (figure == 7 && pos[0][0] == 2 && pos[1][0] == 0 && pos[2][0] == 0 && pos[3][0] == 0 && !attackedCell(isTurnWhite,3,0) && !attackedCell(isTurnWhite,4,0))
-                                validMoves.add((short)(1000*x + 100*y + 10*2));
-                            if (figure == 7 && pos[7][0] == 2 && pos[6][0] == 0 && pos[5][0] == 0 && !attackedCell(isTurnWhite,5,0) && !attackedCell(isTurnWhite,4,0))
-                                validMoves.add((short)(1000*x + 100*y + 10*6));
-                            if (figure == 15 && pos[0][7] == 10 && pos[1][7] == 0 && pos[2][7] == 0 && pos[3][7] == 0 && !attackedCell(isTurnWhite,3,7) && !attackedCell(isTurnWhite,4,7))
-                                validMoves.add((short)(1000*x + 100*y + 10*2 + 7));
-                            if (figure == 15 && pos[7][7] == 10 && pos[6][7] == 0 && pos[5][7] == 0 && !attackedCell(isTurnWhite,5,7) && !attackedCell(isTurnWhite,4,7))
-                                validMoves.add((short)(1000*x + 100*y + 10*6 + 7));
-                            break;
-                        }
-                    }
-                }
+        if (isTurnWhite){
+            if (figure == 1){
+                bitBoard.WHITE_PAWN &= ~(1L << from);
+                bitBoard.WHITE_PAWN |= 1L << to;
             }
-        if (capture && validMoves.size()>0){
-            ArrayList<Short> captures = new ArrayList<>();
-            for (Short validMove : validMoves) {
-                byte[] move = numToMove(validMove);
-                if (move[3] == 9 || pos[move[2]][move[3]] != 0)
-                    captures.add(validMove);
-                return sortMoves(captures,kill);
+            else if (figure == 2){
+                bitBoard.WHITE_ROOK &= ~(1L << from);
+                bitBoard.WHITE_ROOK |= 1L << to;
             }
-        }
-        return sortMoves(validMoves,kill);
-    }
-
-    ArrayList<Short> sortMoves(ArrayList<Short> moves, int kill[]) {
-        if (kill != null)
-            for (int i = 1; i >= 0; i--)
-                if (moves.contains((short) kill[i])) {
-                    moves.remove(new Short((short) kill[i]));
-                    moves.add(0, (short) kill[i]);
-                }
-
-
-        byte[][] k = new byte[moves.size()][2];
-
-        int count = 0;
-        for (short moveNum :
-                moves) {
-            byte move[] = numToMove(moveNum);
-            if (move[3] == 9) {
-                k[count][0] = (byte) 39900;
-                k[count][1] = (byte) count;
-                count++;
-                continue;
+            else if (figure == 3){
+                bitBoard.WHITE_KNIGHT &= ~(1L << from);
+                bitBoard.WHITE_KNIGHT |= 1L << to;
             }
-            if ((pos[move[0]][move[1]] == 1 && move[1] == 6) || (pos[move[0]][move[1]] == 9 && move[1] == 1)) {
-                int cost = 0;
-                if (move[3] == 3)
-                    cost = 500;
-                if (move[3] == 4)
-                    cost = 300;
-                if (move[3] == 5)
-                    cost = 320;
-                if (move[3] == 6)
-                    cost = 900;
-                k[count][0] = (byte) ((pos[move[2]][(((pos[move[0]][move[1]] == 1) ? 7 : 0))] == 0 ? cost : 400 * (cost + Math.abs(cost(move[2], move[3]))) - Math.abs(cost(move[0], move[1]))));
-                k[count][1] = (byte) count;
-                count++;
-                continue;
+            else if (figure == 4){
+                bitBoard.WHITE_BISHOP &= ~(1L << from);
+                bitBoard.WHITE_BISHOP |= 1L << to;
             }
-            if (pos[move[2]][move[3]] == 7 || pos[move[2]][move[3]] == 8 || pos[move[2]][move[3]] == 15 || pos[move[2]][move[3]] == 16) {
-                ArrayList<Short> list = new ArrayList<>();
-                list.add(moveToNum(move));
-                return list;
+            else if (figure == 5){
+                bitBoard.WHITE_QUEEN &= ~(1L << from);
+                bitBoard.WHITE_QUEEN |= 1L << to;
             }
-            k[count][0] = (byte) ((pos[move[2]][move[3]] == 0) ? 0 : 400 * Math.abs(cost(move[2], move[3])) - Math.abs(cost(move[0], move[1])));
-            k[count][1] = (byte) count;
-            count++;
-        }
-        Arrays.sort(k, Comparator.comparingInt(a -> -a[0]));
-
-        ArrayList<Short> sort = new ArrayList<>();
-
-        for (byte[] num : k) {
-            sort.add(moves.get(num[1]));
-        }
-
-        if (lastMove != 0)
-            for (int i = sort.size() - 1; i >= 0; i--)
-                if (sort.get(i) % 100 == lastMove) {
-                    moves.add(0, moves.remove(i));
-                    break;
-                }
-
-        short[] hash = AI.history.get(getKey());
-
-        if (hash != null)
-            for (int i = hash.length - 1; i >= 0; i--)
-                for (int j = sort.size() - 1; j >= 0; j--)
-                    if (hash[i] == sort.get(j)) {
-                        sort.add(0, sort.remove(j));
-                        break;
-                    }
-
-        return sort;
-    }
-
-    boolean isCheckMateTo(boolean white, boolean paste){
-        ArrayList<Short> validMoves = getMoves(white,false);
-        if (isCheckTo(white)!=paste) {
-            for (short move :
-                    validMoves) {
-                Board board = new Board(pos, pawn);
-                board = Game.makeMove(board, move);
-                short move2 = board.getMoves(!white,false).get(0);
-                board = Game.makeMove(board,move2);
-                if (board.haveKing() == 0)
-                    return false;
+            else if (figure == 6){
+                bitBoard.WHITE_KING &= ~(1L << from);
+                bitBoard.WHITE_KING |= 1L << to;
             }
+            kill(bitBoard,false,to);
+        } else {
+            if (figure == 7){
+                bitBoard.BLACK_PAWN &= ~(1L << from);
+                bitBoard.BLACK_PAWN |= 1L << to;
+            }
+            else if (figure == 8){
+                bitBoard.BLACK_ROOK &= ~(1L << from);
+                bitBoard.BLACK_ROOK |= 1L << to;
+            }
+            else if (figure == 9){
+                bitBoard.BLACK_KNIGHT &= ~(1L << from);
+                bitBoard.BLACK_KNIGHT |= 1L << to;
+            }
+            else if (figure == 10){
+                bitBoard.BLACK_BISHOP &= ~(1L << from);
+                bitBoard.BLACK_BISHOP |= 1L << to;
+            }
+            else if (figure == 11){
+                bitBoard.BLACK_QUEEN &= ~(1L << from);
+                bitBoard.BLACK_QUEEN |= 1L << to;
+            }
+            else if (figure == 12){
+                bitBoard.BLACK_KING &= ~(1L << from);
+                bitBoard.BLACK_KING |= 1L << to;
+            }
+            kill(bitBoard,true,to);
         }
-        else
-            return false;
-        return true;
-    }
-    boolean isCheckMateTo(boolean white){
-        return isCheckMateTo(white,false);
-    }
-
-    byte[] numToMove(short number){
-        byte[] result = new byte[4];
-        for (int i = 3, x = number; i >= 0; i--) {
-            result[i] = (byte)(x % 10);
-            x /= 10;
-        }
-        return result;
-    }
-
-    short moveToNum(byte[] move){
-        return (short) (1000*move[0]+100*move[1]+10*move[2]+move[3]);
-    }
-
-    int cost(int x, int y) {
-
-        final int costKing = 30000;
-        final int costQueen = 1100;
-        final int costKnight = 400;
-        final int costBishop = 410;
-        final int costRook = 600;
-        final int costPawn = 100;
-
-        switch (pos[x][y]) {
-            case 0:
-                return 0;
-            case 1:
-                return costPawn;
-            case 2:
-            case 3:
-                return costRook;
-            case 4:
-                return costKnight;
-            case 5:
-                return costBishop;
-            case 6:
-                return costQueen;
-            case 7:
-            case 8:
-                return costKing;
-            case 9:
-                return -costPawn;
-            case 10:
-            case 11:
-                return -costRook;
-            case 12:
-                return -costKnight;
-            case 13:
-                return -costBishop;
-            case 14:
-                return -costQueen;
-            case 15:
-            case 16:
-                return -costKing;
-        }
-        return 0;
-    }
-
-    boolean inBoard(int x, int y) {
-        return (x < 8 && y < 8 && x > -1 && y > -1);
-    }
-
-    boolean attackedCell(boolean isTurnWhite, int x, int y) {
-        int[][] dK = {{0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}};
-        int[][] dN = {{-1, 2}, {1, 2}, {2, -1}, {2, 1}, {-1, -2}, {1, -2}, {-2, -1}, {-2, 1}};
-        int[][] dP = {{1, 1}, {-1, 1}};
-        int[][] dB = {{1, 1}, {-1, -1}, {-1, 1}, {1, -1}};
-        int[][] dR = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-        for (int[] dir : dK)
-            if (inBoard(x + dir[0], y + dir[1]) && (pos[x + dir[0]][y + dir[1]] == ((!isTurnWhite) ? 7 : 15) || pos[x + dir[0]][y + dir[1]] == ((!isTurnWhite) ? 8 : 16)))
-                return true;
-        for (int[] dir : dN)
-            if (inBoard(x + dir[0], y + dir[1]) && (pos[x + dir[0]][y + dir[1]] == ((!isTurnWhite) ? 4 : 12)))
-                return true;
-        for (int[] dir : dP)
-            if (inBoard(x + dir[0], y + dir[1] * ((isTurnWhite) ? 1 : -1)) && (pos[x + dir[0]][y + dir[1] * ((isTurnWhite) ? 1 : -1)] == ((!isTurnWhite) ? 1 : 9)))
-                return true;
-        for (int[] dir : dR)
-            for (int i = 1; i < 8; i++)
-                if (inBoard(x + i * dir[0], y + i * dir[1]) && (pos[x + i * dir[0]][y + i * dir[1]] == ((!isTurnWhite) ? 2 : 10) || pos[x + i * dir[0]][y + i * dir[1]] == ((!isTurnWhite) ? 3 : 11) || pos[x + i * dir[0]][y + i * dir[1]] == ((!isTurnWhite) ? 6 : 14)))
-                    return true;
-                else if (!inBoard(x + i * dir[0], y + i * dir[1]) || pos[x + i * dir[0]][y + i * dir[1]] != 0)
-                    break;
-        for (int[] dir : dB)
-            for (int i = 1; i < 8; i++)
-                if (inBoard(x + i * dir[0], y + i * dir[1]) && (pos[x + i * dir[0]][y + i * dir[1]] == ((!isTurnWhite) ? 5 : 13) || pos[x + i * dir[0]][y + i * dir[1]] == ((!isTurnWhite) ? 6 : 14)))
-                    return true;
-                else if (!inBoard(x + i * dir[0], y + i * dir[1]) || pos[x + i * dir[0]][y + i * dir[1]] != 0)
-                    break;
-        return false;
-    }
-
-    boolean isCheckTo(boolean white) {
-        for (int x = 0; x < 8; x++)
-            for (int y = 0; y < 8; y++)
-                if ((pos[x][y] == ((white) ? 7 : 15) || pos[x][y] == ((white) ? 8 : 16)))
-                    return attackedCell(white, x, y);
-        return false;
-    }
-
-    int haveKing() {
-        boolean haveW = false, haveB = false;
-        for (int x = 0; x < 8; x++)
-            for (int y = 0; y < 8; y++)
-                if (pos[x][y] == 7 || pos[x][y] == 8)
-                    haveW = true;
-        for (int x = 0; x < 8; x++)
-            for (int y = 0; y < 8; y++)
-                if (pos[x][y] == 15 || pos[x][y] == 16)
-                    haveB = true;
-        if (!haveB)
-            return 30000;
-        if (!haveW)
-            return -30000;
-        return 0;
-    }
-
-    long getKey() {
-        long hash = 0L;
-        for (int x = 0; x < 8; x++)
-            for (int y = 0; y < 8; y++)
-                if (pos[x][y] != 0)
-                    hash = hash ^ Game.zKeys[pos[x][y] - 1][8 * x + y];
-        return hash;
+        update_rotated_bitboards(bitBoard,from,to,null);
+        return bitBoard;
     }
 }
