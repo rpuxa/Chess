@@ -18,27 +18,25 @@ class Move {
             if (from == null)
                 from = i;
             else {
-                if (bitBoard.getFigure(from) == 1 && from/8==6 && i/8==7 && Game.makeLegalMove(BitBoard.make_bitboard_from(bitBoard),move_init(from,i,bitBoard.getFigure(from),1))) {
+                if (bitBoard.getFigure(from) == 1 && from / 8 == 6 && i / 8 == 7 && Game.makeLegalMove(BitBoard.make_bitboard_from(bitBoard), move_init(from, i, bitBoard.getFigure(from), 1))) {
                     to = i;
                     new Chose().setVisible(true);
-                }
-                else if (Game.makeLegalMove(BitBoard.make_bitboard_from(bitBoard),move_init(from,i,bitBoard.getFigure(from),0))) {
-                    move = move_init(from,i,bitBoard.getFigure(from),0);
+                } else if (Game.makeLegalMove(BitBoard.make_bitboard_from(bitBoard), move_init(from, i, bitBoard.getFigure(from), 0))) {
+                    move = move_init(from, i, bitBoard.getFigure(from), 0);
                     clear();
-                    block =true;
-                }
-                else
-                  from = i;
+                    block = true;
+                } else
+                    from = i;
             }
 
     }
 
-    static void clear(){
+    static void clear() {
         from = null;
         to = null;
     }
 
-    private static int move_init(int from, int to, int figure, int promotion){
+    private static int move_init(int from, int to, int figure, int promotion) {
         return (((((from << 6) + to) << 4) + figure) << 3) + promotion;
     }
 
@@ -54,17 +52,16 @@ class Move {
                 if (BitUtils.getBit(bitBoard.white[j], i)) {
                     buttons[i].setIcon(new ImageIcon("Icons/W" + symbols[j] + color + ".png"));
                     break;
-                }
-                else if (BitUtils.getBit(bitBoard.black[j], i)) {
+                } else if (BitUtils.getBit(bitBoard.black[j], i)) {
                     buttons[i].setIcon(new ImageIcon("Icons/B" + symbols[j] + color + ".png"));
                     break;
                 }
-                    buttons[i].setIcon(new ImageIcon("Icons/" + color + ".png"));
+                buttons[i].setIcon(new ImageIcon("Icons/" + color + ".png"));
             }
         }
     }
 
-    static void sounds(String sound){
+    static void sounds(String sound) {
         try {
             File soundFile = new File(sound);
             AudioInputStream ais = AudioSystem.getAudioInputStream(soundFile);

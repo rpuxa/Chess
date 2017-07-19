@@ -255,7 +255,7 @@ class Chose extends JFrame {
     }
 }
 
-class Edit{
+class Edit {
     static boolean start = false;
     static JButton[] buttons = new JButton[64];
 }

@@ -1,9 +1,7 @@
-import java.io.IOException;
-
 import static Util.BitUtils.*;
 
-class Eval {
-    
+class Eval implements Constants {
+
     static final int costKing = 30000;
     static final int costQueen = 1100;
     static final int costKnight = 400;
@@ -78,10 +76,10 @@ class Eval {
     private static final int Rook7th = 24;
     private static final int RookOpen = 17;
     private static final int RookDoubled = 4;
-    private static final int[] KingPawnShield = {0,50,90,120};
-    private static final int[] QueenKingTropism = {99,98,94,90,85,80,79,72,65,55,44,32,15,0};
-    private static final int[] KnightMobility = {-11,-3,5,9,12,15,17,18,19};
-    private static final int[] BishopMobility = {-5,5,13,20,25,31,37,43,49,52,55,57,58,59,60,60,60};
+    private static final int[] KingPawnShield = {0, 50, 90, 120};
+    private static final int[] QueenKingTropism = {99, 98, 94, 90, 85, 80, 79, 72, 65, 55, 44, 32, 15, 0};
+    private static final int[] KnightMobility = {-11, -3, 5, 9, 12, 15, 17, 18, 19};
+    private static final int[] BishopMobility = {-5, 5, 13, 20, 25, 31, 37, 43, 49, 52, 55, 57, 58, 59, 60, 60, 60};
     private static final int[] mask_vertical_extended = new int[64];
     private static final int[] mask_vertical = new int[64];
     private static final int[] mask_pawn_passedSquare_white = new int[64];
@@ -92,41 +90,38 @@ class Eval {
     private static final int[] mask_shield_white = new int[64];
 
 
-
-
     static int evaluate(BitBoard bitBoard) {
-        int material_white = 0,material_black = 0;
+        int material_white = 0, material_black = 0;
 
-        int whiteBishops = 0,blackBishops = 0;
+        int whiteBishops = 0, blackBishops = 0;
 
         int ShieldBlack = 0, ShieldWhite = 0;
 
-        int KingWhite_g=0,KingWhite_v=0;
-        int KingBlack_g=0,KingBlack_v=0;
+        int KingWhite_g = 0, KingWhite_v = 0;
+        int KingBlack_g = 0, KingBlack_v = 0;
 
         long white = bitBoard.white[pawn] | bitBoard.white[rook] | bitBoard.white[knight] | bitBoard.white[bishop] | bitBoard.white[queen] | bitBoard.white[king];
         long black = bitBoard.black[pawn] | bitBoard.black[rook] | bitBoard.black[knight] | bitBoard.black[bishop] | bitBoard.black[queen] | bitBoard.black[king];
 
         for (int i = 0; i < 64; i++) {
-            if (getBit(bitBoard.white[king],i)) {
-                KingWhite_g = i/8;
-                KingWhite_v = i%8;
+            if (getBit(bitBoard.white[king], i)) {
+                KingWhite_g = i / 8;
+                KingWhite_v = i % 8;
                 ShieldWhite = Long.bitCount(mask_shield_white[i] & bitBoard.white[pawn]);
-            }
-            else if (getBit(bitBoard.black[king],i)) {
-                KingBlack_g = i/8;
-                KingBlack_v = i%8;
+            } else if (getBit(bitBoard.black[king], i)) {
+                KingBlack_g = i / 8;
+                KingBlack_v = i % 8;
                 ShieldBlack = Long.bitCount(mask_shield_black[i] & bitBoard.black[pawn]);
             }
 
-            if (getBit(white,i) && !getBit(bitBoard.white[pawn],i) && !getBit(bitBoard.white[king],i)) {
-                if (getBit(bitBoard.white[bishop],i))
+            if (getBit(white, i) && !getBit(bitBoard.white[pawn], i) && !getBit(bitBoard.white[king], i)) {
+                if (getBit(bitBoard.white[bishop], i))
                     whiteBishops++;
                 material_white += bitBoard.cost(i);
                 continue;
             }
-            if (getBit(black,i) && !getBit(bitBoard.black[pawn],i) && !getBit(bitBoard.black[king],i)) {
-                if (getBit(bitBoard.black[bishop],i))
+            if (getBit(black, i) && !getBit(bitBoard.black[pawn], i) && !getBit(bitBoard.black[king], i)) {
+                if (getBit(bitBoard.black[bishop], i))
                     blackBishops++;
                 material_black -= bitBoard.cost(i);
             }
@@ -153,7 +148,7 @@ class Eval {
 
         for (int i = 0; i < 64; i++) {
             score += bitBoard.cost(i);
-            if (getBit(bitBoard.white[pawn],i)) {
+            if (getBit(bitBoard.white[pawn], i)) {
 
                 score += Pawn[63 - i];
                 if ((mask_vertical_extended[i] & bitBoard.white[pawn]) == 0)
@@ -169,24 +164,23 @@ class Eval {
                 if ((mask_vertical[i] & bitBoard.white[pawn]) != 0)
                     score += PawnDoubled;
 
-            } else if (getBit(bitBoard.white[rook],i)) {
+            } else if (getBit(bitBoard.white[rook], i)) {
 
-                if (i/8 == 7)
+                if (i / 8 == 7)
                     score += Rook7th;
                 if ((mask_vertical[i] & (bitBoard.white[pawn] | bitBoard.black[pawn])) == 0)
                     score += RookOpen;
                 if ((mask_vertical[i] & bitBoard.white[rook]) != 0)
                     score += RookDoubled;
 
-            } else if (getBit(bitBoard.white[knight],i)) {
+            } else if (getBit(bitBoard.white[knight], i)) {
 
                 score += KnightMobility[Long.bitCount(Mask.knight[i] & ~white)];
                 if ((mask_vertical_extended[i] & bitBoard.black[pawn]) == 0 && (mask_knightOutpost_white[i] & bitBoard.white[pawn]) != 0)
                     score += KnightOutpost;
                 score += Knight[63 - i];
 
-            }
-            else if (getBit(bitBoard.white[bishop],i)) {
+            } else if (getBit(bitBoard.white[bishop], i)) {
                 int nd = i / 8 - i % 8 + 7;
                 long mask = (bitBoard.all[2] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2))) & 255;
                 long moves = Mask.bishop_L[i][(int) mask] & ~white;
@@ -194,24 +188,21 @@ class Eval {
                 mask = (bitBoard.all[3] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2))) & 255;
                 score += BishopMobility[Long.bitCount((Mask.bishop_R[i][(int) mask] & ~white) | moves)];
                 score += Bishop[63 - i];
-            } else if (getBit(bitBoard.white[queen],i)) {
+            } else if (getBit(bitBoard.white[queen], i)) {
                 try {
                     score += QueenKingTropism[Math.abs(i / 8 - KingBlack_g) + Math.abs(i % 8 - KingBlack_v) - 1];
-                }
-                catch (ArrayIndexOutOfBoundsException e){
+                } catch (ArrayIndexOutOfBoundsException e) {
                     System.out.println();
                 }
-            } else if (getBit(bitBoard.white[king],i)) {
+            } else if (getBit(bitBoard.white[king], i)) {
 
                 if (!endGameForWhite) {
                     score += KingStart[63 - i];
                     score += KingPawnShield[ShieldWhite];
-                }
-                else
+                } else
                     score += KingEnd[63 - i];
 
-            }
-            else if (getBit(bitBoard.black[pawn],i)) {
+            } else if (getBit(bitBoard.black[pawn], i)) {
 
                 score -= Pawn[i];
                 if ((mask_vertical_extended[i] & bitBoard.black[pawn]) == 0)
@@ -227,24 +218,23 @@ class Eval {
                 if ((mask_vertical[i] & bitBoard.black[pawn]) != 0)
                     score -= PawnDoubled;
 
-            } else if (getBit(bitBoard.black[rook],i)){
+            } else if (getBit(bitBoard.black[rook], i)) {
 
-                if (i/8 == 1)
+                if (i / 8 == 1)
                     score -= Rook7th;
                 if ((mask_vertical[i] & (bitBoard.white[pawn] | bitBoard.black[pawn])) == 0)
                     score -= RookOpen;
                 if ((mask_vertical[i] & bitBoard.black[rook]) != 0)
                     score -= RookDoubled;
 
-            } else if (getBit(bitBoard.black[knight],i)) {
+            } else if (getBit(bitBoard.black[knight], i)) {
 
                 score -= KnightMobility[Long.bitCount(Mask.knight[i] & ~black)];
                 if ((mask_vertical_extended[i] & bitBoard.white[pawn]) == 0 && (mask_knightOutpost_black[i] & bitBoard.black[pawn]) != 0)
                     score -= KnightOutpost;
                 score -= Knight[i];
 
-            }
-            else if (getBit(bitBoard.black[bishop],i)){
+            } else if (getBit(bitBoard.black[bishop], i)) {
                 int nd = i / 8 - i % 8 + 7;
                 long mask = (bitBoard.all[2] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2))) & 255;
                 long moves = Mask.bishop_L[i][(int) mask] & ~black;
@@ -252,9 +242,9 @@ class Eval {
                 mask = (bitBoard.all[3] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2))) & 255;
                 score -= BishopMobility[Long.bitCount((Mask.bishop_R[i][(int) mask] & ~black) | moves)];
                 score -= Bishop[i];
-            } else if (getBit(bitBoard.black[queen],i)) {
-                score -= QueenKingTropism[Math.abs(i/8 - KingWhite_g) + Math.abs(i%8 - KingWhite_v) - 1];
-            } else if (getBit(bitBoard.black[king],i)) {
+            } else if (getBit(bitBoard.black[queen], i)) {
+                score -= QueenKingTropism[Math.abs(i / 8 - KingWhite_g) + Math.abs(i % 8 - KingWhite_v) - 1];
+            } else if (getBit(bitBoard.black[king], i)) {
 
                 if (!endGameForBlack) {
                     score -= KingStart[i];
@@ -267,7 +257,7 @@ class Eval {
         return score;
     }
 
-    static void calculate(){
+    static void calculate() {
         for (int i = 0; i < 64; i++) {
             for (int j = 0; j < 64; j++) {
                 if (j != i && Math.abs(i / 8 - j / 8) <= 1)
@@ -279,27 +269,27 @@ class Eval {
                 if (j / 8 <= i / 8 && Math.abs(j % 8 - i % 8) <= i / 8)
                     mask_pawn_passedSquare_black[i] |= 1L << j;
             }
-            if (i/8>=2 && i!=7 && i%8!=7)
+            if (i / 8 >= 2 && i != 7 && i % 8 != 7)
                 mask_knightOutpost_white[i] |= 1L << i - 7;
-            if (i/8>=2 && i!=7 && i%8!=0)
+            if (i / 8 >= 2 && i != 7 && i % 8 != 0)
                 mask_knightOutpost_white[i] |= 1L << i - 9;
-            if (i/8>=5 && i!=0 && i%8!=0)
+            if (i / 8 >= 5 && i != 0 && i % 8 != 0)
                 mask_knightOutpost_black[i] |= 1L << i + 7;
-            if (i/8>=5 && i!=0 && i%8!=7)
+            if (i / 8 >= 5 && i != 0 && i % 8 != 7)
                 mask_knightOutpost_black[i] |= 1L << i + 9;
 
-            if (i/8 == 0 && i%8!=7)
+            if (i / 8 == 0 && i % 8 != 7)
                 mask_shield_white[i] |= 1L << i + 9;
-            if (i/8 == 0)
+            if (i / 8 == 0)
                 mask_shield_white[i] |= 1L << i + 8;
-            if (i/8 == 0 && i%8!=0)
+            if (i / 8 == 0 && i % 8 != 0)
                 mask_shield_white[i] |= 1L << i + 7;
 
-            if (i/8 == 7 && i%8!=7)
+            if (i / 8 == 7 && i % 8 != 7)
                 mask_shield_black[i] |= 1L << i - 7;
-            if (i/8 == 7)
+            if (i / 8 == 7)
                 mask_shield_black[i] |= 1L << i - 8;
-            if (i/8 == 7 && i%8!=0)
+            if (i / 8 == 7 && i % 8 != 0)
                 mask_shield_black[i] |= 1L << i - 9;
 
         }

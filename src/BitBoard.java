@@ -1,5 +1,3 @@
-import Util.BitUtils;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -7,7 +5,7 @@ import java.util.Random;
 
 import static Util.BitUtils.*;
 
-class BitBoard {
+class BitBoard implements Constants{
     long[] white;
     long[] black;
     long pass;
@@ -17,11 +15,11 @@ class BitBoard {
 
 
     BitBoard(long[] white,long[] black, long pass, byte castle, long[] all, byte lastMove){
-        this.white = white.clone();
-        this.black = black.clone();
+        this.white = white;
+        this.black = black;
         this.pass= pass;
         this.castle = castle;
-        this.all = all.clone();
+        this.all = all;
         this.lastMove = lastMove;
     }
 
@@ -38,19 +36,20 @@ class BitBoard {
         return new BitBoard(new long[6],new long[6],0,(byte)0b1111,new long[4],(byte)0);
     }
 
+    private static final long[] WHITE_BASE = {0b1111111100000000,0b10000001,0b1000010,0b100100,0b10000,0b1000};
+    private static final long[] BLACK_BASE = {0b1111111100000000L << 40,0b10000001L << 56,0b1000010L << 56,0b100100L << 56,0b10000L << 56,0b1000L << 56};
+
     static BitBoard make_bitboard_start(){
-        long[] white = {0b1111111100000000,0b10000001,0b1000010,0b100100,0b10000,0b1000};
-        long[] black = {0b1111111100000000L << 40,0b10000001L << 56,0b1000010L << 56,0b100100L << 56,0b10000L << 56,0b1000L << 56};
-        long[] all = all_calculate(white,black);
-        return new BitBoard(white,black,0,(byte)0b1111,all,(byte)0);
+        long[] all = all_calculate(WHITE_BASE,BLACK_BASE);
+        return new BitBoard(WHITE_BASE,BLACK_BASE,0,(byte)0b1111,all,(byte)0);
     }
 
     static BitBoard make_bitboard_from(BitBoard bitBoard){
-        return new BitBoard(bitBoard.white,bitBoard.black,bitBoard.pass,bitBoard.castle,bitBoard.all,bitBoard.lastMove);
+        return new BitBoard(bitBoard.white.clone(),bitBoard.black.clone(),bitBoard.pass,bitBoard.castle,bitBoard.all.clone(),bitBoard.lastMove);
     }
 
     static BitBoard make_bitboard_nullMove_from(BitBoard bitBoard){
-        return new BitBoard(bitBoard.white,bitBoard.black,0,bitBoard.castle,bitBoard.all,bitBoard.lastMove);
+        return new BitBoard(bitBoard.white.clone(),bitBoard.black.clone(),0,bitBoard.castle,bitBoard.all.clone(),bitBoard.lastMove);
     }
 
     private static long[] all_calculate(long[] white, long[] black){
@@ -80,7 +79,7 @@ class BitBoard {
         for (int i = 8; i < 16; i++) {
             int m = 0;
             for (int j = 7 - i; j <= 7; j++){
-                if (j+8*m>-1 && j+8*m<64 && (j+8*m)/8>(j+8*m)%8) {
+                if (j+8*m>-1 && j+8*m<64 && ((j+8*m)>>3)>((j+8*m)&7)) {
                     if (getBit(all,j+8*m))
                         all_rotated_45_left = setBit(all_rotated_45_left,n);
                     n++;
@@ -103,7 +102,7 @@ class BitBoard {
         label: for (int i = 8; i < 16; i++) {
             int m = 8*i;
             for (int j = 0; j <= i; j++){
-                if (j+m>-1 && j+m<64 && (j+m)/8+(j+m)%8>7) {
+                if (j+m>-1 && j+m<64 && ((j+m)>>3)+((j+m)&7)>7) {
                     if (getBit(all,j+m))
                         all_rotated_45_right = setBit(all_rotated_45_right,n);
                     n++;
@@ -164,7 +163,7 @@ class BitBoard {
             boolean isQueen = getBit(ourFigures[queen],i);
             if (getBit(ourFiguresMask,i)) {
                 if (getBit(ourFigures[pawn],i)) {
-                    boolean promotion = i / 8 == ((isTurnWhite) ? 6 : 1);
+                    boolean promotion = (i >>3) == ((isTurnWhite) ? 6 : 1);
                     if (!getBit(all[0],i + pawn_block)) {
                         add(moves, i, ((isTurnWhite) ? Mask.white_pawn_move[i] : Mask.black_pawn_move[i]) & ~all[0] & captureMask,pawn+color, promotion);
                     }
@@ -174,34 +173,36 @@ class BitBoard {
                 else if (getBit(ourFigures[king],i)) {
                     add(moves, i, Mask.king[i] & ~ourFiguresMask & captureMask,king + color);
                     if (isTurnWhite) {
-                        if (i==3)
-                        if ((all[0] & Mask.castle_white[0]) == 0 && getBit(white[rook],0) && getBit(castle,3) && canCastle(0))
-                            moves.add(((193<<4) + 6) << 3);
-                        else if ((all[0] & Mask.castle_white[1]) == 0 && getBit(white[rook],7) && getBit(castle,2) && canCastle(1))
-                            moves.add(((197<<4) + 6) << 3);
+                        if (i==E1)
+                        if ((all[0] & Mask.castle_white[0]) == 0 && getBit(white[rook],H1) && getBit(castle,3) && canCastle(0))
+                            moves.add(white_short_castle_move);
+                        else if ((all[0] & Mask.castle_white[1]) == 0 && getBit(white[rook],A1) && getBit(castle,2) && canCastle(1))
+                            moves.add(white_long_castle_move);
                     } else {
-                        if (i==59)
-                            if ((all[0] & Mask.castle_black[0]) == 0 && getBit(white[rook],56) && getBit(castle,1) && canCastle(2))
-                            moves.add(((3833<<4) + 12) << 3);
-                        else if ((all[0] & Mask.castle_black[1]) == 0 && getBit(white[rook],63) && getBit(castle,0) && canCastle(3))
-                            moves.add((((3837<<4) + 12) << 3));
+                        if (i==E8)
+                            if ((all[0] & Mask.castle_black[0]) == 0 && getBit(white[rook],H8) && getBit(castle,1) && canCastle(2))
+                            moves.add(black_short_castle_move);
+                        else if ((all[0] & Mask.castle_black[1]) == 0 && getBit(white[rook],A8) && getBit(castle,0) && canCastle(3))
+                            moves.add(black_long_castle_move);
                     }
                 } else if (getBit(ourFigures[rook],i) || isQueen) {
                     int figure = ((isQueen) ? queen : rook) + color;
-                    int nd = i / 8;
+                    int nd = i >>3;
                     long mask = (all[0] >> 8 * nd) & 255;
                     add(moves, i, Mask.rook_G[i][(int) mask] & ~ourFiguresMask & captureMask,figure);
-                    nd = 7 - i % 8;
+                    nd = 7 - i & 7;
                     mask = (all[1] >> 8 * nd) & 255;
                     add(moves, i, Mask.rook_V[i][(int) mask] & ~ourFiguresMask & captureMask,figure);
                 }
                 if (getBit(ourFigures[bishop],i) || isQueen) {
                     int figure = ((isQueen) ? queen : bishop) + color;
-                    int nd = i / 8 - i % 8 + 7;
-                    long mask = all[2] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
+                    int nd =(i >> 3) - (i & 7) + 7;
+                    int shift = ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2));
+                    long mask = (all[2] >> shift) & 255;
                     add(moves, i, Mask.bishop_L[i][(int) mask] & ~ourFiguresMask & captureMask,figure);
-                    nd = i / 8 + i % 8;
-                    mask = all[3] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
+                    nd = (i >> 3) + (i & 7);
+                    shift = ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2));
+                    mask = (all[3] >> shift) & 255;
                     add(moves, i, Mask.bishop_R[i][(int) mask] & ~ourFiguresMask & captureMask,figure);
                 }
             }
@@ -221,15 +222,8 @@ class BitBoard {
             // int figure =  15 & (moveNum >> 3);
             int move[] = {moveNum >> 13, (moveNum >> 7) & 63};
             if (promotion != 0) {
-                int cost = 0;
-                if (promotion == 1)
-                    cost = Eval.costQueen;
-                else if (promotion == 2)
-                    cost = Eval.costRook;
-                else if (promotion == 3)
-                    cost = Eval.costKnight;
-                else if (promotion == 4)
-                    cost = Eval.costBishop;
+                int costs[] = {Eval.costQueen, Eval.costRook, Eval.costKnight,Eval.costBishop};
+                int cost = costs[promotion - 1];
                 k[count][0] = 400 * cost;
                 k[count][1] = count;
                 count++;
@@ -297,21 +291,23 @@ class BitBoard {
             return true;
 
         long attack;
-        int nd = cell / 8;
+        int nd = cell >>3;
         long mask = (all[0] >> 8 * nd) & 255;
         attack = Mask.rook_G[cell][(int) mask];
-        nd = 7 - cell % 8;
+        nd = 7 - cell & 7;
         mask = (all[1] >> 8 * nd) & 255;
         attack |= Mask.rook_V[cell][(int) mask];
 
         if ((attack & (enemyFigures[rook] | enemyFigures[queen])) != 0)
             return true;
 
-        nd = cell / 8 - cell % 8 + 7;
-        mask = all[2] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
+        nd = (cell >> 3) - (cell & 7) + 7;
+        int shift = ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2));
+        mask = all[2] >> shift & 255;
         attack = Mask.bishop_L[cell][(int) mask];
-        nd = cell / 8 + cell % 8;
-        mask = all[3] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
+        nd = (cell >> 3) + (cell & 7);
+        shift = ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2));
+        mask = all[3] >> shift & 255;
         attack |= Mask.bishop_R[cell][(int) mask];
 
         return  (attack & (enemyFigures[rook] | enemyFigures[queen])) != 0;
@@ -321,7 +317,7 @@ class BitBoard {
     private static double log2 = Math.log(2);
 
     boolean isCheckTo(boolean white){
-        long king = (white) ? this.white[BitUtils.king] : black[BitUtils.king];
+        long king = (white) ? this.white[Constants.king] : black[Constants.king];
         return attack_cell(white,(int)Math.round(Math.log(king)/log2));
     }
 
@@ -373,16 +369,16 @@ class BitBoard {
 
 class Mask {
     static long[] white_pawn_attack = new long[64];
-    static long[] white_pawn_move= new long[64];
-    static long[] black_pawn_attack= new long[64];
-    static long[] black_pawn_move= new long[64];
-    static long[] knight= new long[64];
-    static long[] king= new long[64];
-    static long[][] bishop_R= new long[64][256];
-    static long[][] bishop_L= new long[64][256];
-    static long[][] rook_G= new long[64][256];
-    static long[][] rook_V= new long[64][256];
-    static long[] castle_white = {0b110,0b1110000};
+    static long[] white_pawn_move = new long[64];
+    static long[] black_pawn_attack = new long[64];
+    static long[] black_pawn_move = new long[64];
+    static long[] knight = new long[64];
+    static long[] king = new long[64];
+    static long[][] bishop_R = new long[64][256];
+    static long[][] bishop_L = new long[64][256];
+    static long[][] rook_G = new long[64][256];
+    static long[][] rook_V = new long[64][256];
+    static long[] castle_white = {0b110, 0b1110000};
     static long[] castle_black = new long[2];
     static long[] cell_default = new long[64];
     static long[] cell_rotated_90 = new long[64];
@@ -394,7 +390,7 @@ class Mask {
 
         BitBoard bitBoard = BitBoard.make_bitboard_start();
         long st = System.currentTimeMillis();
-        for (int i = 0; i < 1000*1000; i++) {
+        for (int i = 0; i < 1000 * 1000; i++) {
             bitBoard.getMoves(true);
         }
         long secondTime = System.currentTimeMillis() - st;
@@ -405,62 +401,63 @@ class Mask {
         return x >= 0 && x <= 7 && y >= 0 && y <= 7;
     }
 
-    private static long rotate_90(long mask){
+    private static long rotate_90(long mask) {
         long rotate = 0;
         for (int x = 0; x < 8; x++)
             for (int y = 0; y < 8; y++)
                 if (((mask >> (8 * (7 - x) + y)) & 1) != 0) {
-                    rotate |= 1L << (8*y+x);
+                    rotate |= 1L << (8 * y + x);
                 }
-                return rotate;
+        return rotate;
     }
 
-    private static long rotate_R(long mask){
+    private static long rotate_R(long mask) {
         long rotated = 0;
         int n = 0;
         for (int i = 0; i < 8; i++) {
-            int m = 8*i;
-            for (int j = 0; j <= i; j++){
+            int m = 8 * i;
+            for (int j = 0; j <= i; j++) {
                 if (((mask >> n) & 1) != 0)
-                    rotated |= 1L << j+m;
-                m-=8;
+                    rotated |= 1L << j + m;
+                m -= 8;
                 n++;
             }
         }
-        label: for (int i = 8; i < 16; i++) {
-            int m = 8*i;
-            for (int j = 0; j <= i; j++){
-                if (j+m>-1 && j+m<64 && (j+m)/8+(j+m)%8>7) {
+        label:
+        for (int i = 8; i < 16; i++) {
+            int m = 8 * i;
+            for (int j = 0; j <= i; j++) {
+                if (j + m > -1 && j + m < 64 && ((j + m) >> 3) + ((j + m) & 7) > 7) {
                     if (((mask >> n) & 1) != 0)
-                        rotated |= 1L << j+m;
+                        rotated |= 1L << j + m;
                     n++;
-                    if (j+m == 63)
+                    if (j + m == 63)
                         break label;
                 }
-                m-=8;
+                m -= 8;
             }
         }
         return rotated;
     }
 
-    private static long rotate_L(long mask){
+    private static long rotate_L(long mask) {
         long rotated = 0;
         int n = 0;
         for (int i = 0; i < 8; i++) {
             int m = 0;
-            for (int j = 7 - i; j <= 7; j++){
+            for (int j = 7 - i; j <= 7; j++) {
                 if (((mask >> n) & 1) != 0)
-                    rotated |= 1L << j+8*m;
+                    rotated |= 1L << j + 8 * m;
                 m++;
                 n++;
             }
         }
         for (int i = 8; i < 16; i++) {
             int m = 0;
-            for (int j = 7 - i; j <= 7; j++){
-                if (j+8*m>-1 && j+8*m<64 && (j+8*m)/8>(j+8*m)%8) {
+            for (int j = 7 - i; j <= 7; j++) {
+                if (j + 8 * m > -1 && j + 8 * m < 64 && (j + 8 * m) / 8 > ((j + 8 * m) & 7)) {
                     if (((mask >> n) & 1) != 0)
-                        rotated |= 1L << j+8*m;
+                        rotated |= 1L << j + 8 * m;
                     n++;
                 }
                 m++;
@@ -475,8 +472,8 @@ class Mask {
         int i = 0;
         for (int y = 0; y < 8; y++)
             for (int x = 0; x < 8; x++) {
-            //cell
-                 cell_default[8*y+x] |= 1L << 8*y+x;
+                //cell
+                cell_default[8 * y + x] |= 1L << 8 * y + x;
                 //knight
                 for (int y2 = -2; y2 <= 2; y2 += 4)
                     for (int x2 = -1; x2 <= 1; x2 += 2)
@@ -511,84 +508,84 @@ class Mask {
                     if (B(x + d[0], y + d[1]))
                         king[i] |= 1L << (x + d[0] + 8 * (y + d[1]));
 
-                    //rook
+                //rook
                 for (long block = 0; block < 256; block++) {
                     int nd = y;
-                    long mask = block << 8*nd;
+                    long mask = block << 8 * nd;
                     for (int j = 0; j < 2; j++) {
                         int dir[][] = {{1, 0}, {-1, 0}};
                         int k = 1;
                         while (B(x + k * dir[j][0], y + k * dir[j][1]) && ((mask >> (8 * (y + k * dir[j][1]) + x + k * dir[j][0])) & 1) == 0) {
-                            rook_G[i][(int)block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
+                            rook_G[i][(int) block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
                             k++;
                         }
                         if (((mask >> (8 * (y + k * dir[j][1]) + x + k * dir[j][0])) & 1) != 0 && B(x + k * dir[j][0], y + k * dir[j][1]))
-                            rook_G[i][(int)block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
+                            rook_G[i][(int) block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
                     }
 
-                    nd = 7-x;
-                    mask = rotate_90(block << 8*nd);
+                    nd = 7 - x;
+                    mask = rotate_90(block << 8 * nd);
                     for (int j = 0; j < 2; j++) {
                         int dir[][] = {{0, 1}, {0, -1}};
                         int k = 1;
                         while (B(x + k * dir[j][0], y + k * dir[j][1]) && ((mask >> (8 * (y + k * dir[j][1]) + x + k * dir[j][0])) & 1) == 0) {
-                            rook_V[i][(int)block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
+                            rook_V[i][(int) block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
                             k++;
                         }
                         if (((mask >> (8 * (y + k * dir[j][1]) + x + k * dir[j][0])) & 1) != 0 && B(x + k * dir[j][0], y + k * dir[j][1]))
-                            rook_V[i][(int)block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
+                            rook_V[i][(int) block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
                     }
 
                 }
-                    //bishop
+                //bishop
                 for (long block = 0; block < 256; block++) {
-                    int nd = y-x+7;
-                    long mask = rotate_L(block << ((nd >= 9) ? ((21-nd)*(nd-8)/2+36):(nd*(nd+1)/2)));
+                    int nd = y - x + 7;
+                    long mask = rotate_L(block << ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)));
                     for (int j = 0; j < 2; j++) {
                         int dir[][] = {{1, 1}, {-1, -1}};
                         int k = 1;
                         while (B(x + k * dir[j][0], y + k * dir[j][1]) && ((mask >> (8 * (y + k * dir[j][1]) + x + k * dir[j][0])) & 1) == 0) {
-                            bishop_L[i][(int)block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
+                            bishop_L[i][(int) block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
                             k++;
                         }
                         if (((mask >> (8 * (y + k * dir[j][1]) + x + k * dir[j][0])) & 1) != 0 && B(x + k * dir[j][0], y + k * dir[j][1]))
-                            bishop_L[i][(int)block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
+                            bishop_L[i][(int) block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
                     }
 
-                    nd = y+x;
-                    mask = rotate_R(block << ((nd >= 9) ? ((21-nd)*(nd-8)/2+36):(nd*(nd+1)/2)));
+                    nd = y + x;
+                    mask = rotate_R(block << ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)));
                     for (int j = 0; j < 2; j++) {
                         int dir[][] = {{-1, 1}, {1, -1}};
                         int k = 1;
                         while (B(x + k * dir[j][0], y + k * dir[j][1]) && ((mask >> (8 * (y + k * dir[j][1]) + x + k * dir[j][0])) & 1) == 0) {
-                            bishop_R[i][(int)block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
+                            bishop_R[i][(int) block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
                             k++;
                         }
                         if (((mask >> (8 * (y + k * dir[j][1]) + x + k * dir[j][0])) & 1) != 0 && B(x + k * dir[j][0], y + k * dir[j][1]))
-                            bishop_R[i][(int)block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
+                            bishop_R[i][(int) block] |= 1L << (8 * (y + k * dir[j][1]) + x + k * dir[j][0]);
                     }
                 }
-                    i++;
+                i++;
             }
 
         for (int x = 0; x < 8; x++)
             for (int y = 0; y < 8; y++) {
-                    cell_rotated_90[8*y+x] |= 1L << 8 * (7 - x) + y;
-                }
+                cell_rotated_90[8 * y + x] |= 1L << 8 * (7 - x) + y;
+            }
         int n = 0;
         for (int i2 = 0; i2 < 8; i2++) {
             int m = 0;
-            for (int j = 7 - i2; j <= 7; j++){
-                cell_rotated_45_left[j + 8*m] |= 1L << n;
+            for (int j = 7 - i2; j <= 7; j++) {
+                cell_rotated_45_left[j + 8 * m] |= 1L << n;
                 m++;
                 n++;
             }
         }
         for (int i2 = 8; i2 < 16; i2++) {
             int m = 0;
-            for (int j = 7 - i2; j <= 7; j++){
-                if (j+8*m>-1 && j+8*m<64 && (j+8*m)/8>(j+8*m)%8) {
-                    cell_rotated_45_left[j + 8*m] |= 1L << n;
+            for (int j = 7 - i2; j <= 7; j++) {
+                if (j + 8 * m > -1 && j + 8 * m < 64 && ((j + 8 * m) >> 3) > ((j + 8 * m) & 7)) {
+                    cell_rotated_45_left[j + 8 * m] |= 1L << n;
                     n++;
                 }
                 m++;
@@ -598,23 +595,24 @@ class Mask {
 
         n = 0;
         for (int i2 = 0; i2 < 8; i2++) {
-            int m = 8*i2;
-            for (int j = 0; j <= i2; j++){
+            int m = 8 * i2;
+            for (int j = 0; j <= i2; j++) {
                 cell_rotated_45_right[j + m] |= 1L << n;
-                m-=8;
+                m -= 8;
                 n++;
             }
         }
-        label: for (int i2 = 8; i2 < 16; i2++) {
-            int m = 8*i2;
-            for (int j = 0; j <= i2; j++){
-                if (j+m>-1 && j+m<64 && (j+m)/8+(j+m)%8>7) {
+        label:
+        for (int i2 = 8; i2 < 16; i2++) {
+            int m = 8 * i2;
+            for (int j = 0; j <= i2; j++) {
+                if (j + m > -1 && j + m < 64 && ((j + m) >> 3) + ((j + m) & 7) > 7) {
                     cell_rotated_45_right[j + m] |= 1L << n;
                     n++;
-                    if (j+m == 63)
+                    if (j + m == 63)
                         break label;
                 }
-                m-=8;
+                m -= 8;
             }
         }
     }
