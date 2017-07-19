@@ -1,7 +1,8 @@
+import Util.BitUtils;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.util.ArrayList;
 import java.util.Objects;
 
 public class Gui extends JFrame {
@@ -29,8 +30,7 @@ public class Gui extends JFrame {
                     Move.buttons[i].setAction(new AbstractAction() {
                         @Override
                         public void actionPerformed(ActionEvent e) {
-                            final int i2 = i1;
-                                Move.change(i2);
+                            Move.change(i1);
                         }
                     });
                 add(Move.buttons[i]);
@@ -43,7 +43,7 @@ public class Gui extends JFrame {
 
 class Editor extends JFrame {
 
-    String chose = "_";
+    private String chose = "_";
 
     @Override
     protected void frameInit() {
@@ -69,12 +69,11 @@ class Editor extends JFrame {
                         @Override
                         public void actionPerformed(ActionEvent e) {
                             ImageIcon icon;
-                            final int i2 = i1;
-                            if ((i2/8 + i2%8) % 2 == 1)
+                            if ((i1 /8 + i1 %8) % 2 == 1)
                                 icon = new ImageIcon("Icons/"+chose+"B.png");
                             else
                                 icon = new ImageIcon("Icons/"+chose+"W.png");
-                                Edit.buttons[i2].setIcon(icon);
+                                Edit.buttons[i1].setIcon(icon);
                         }
                     });
                 add(Edit.buttons[i]);
@@ -125,46 +124,26 @@ class Editor extends JFrame {
         accept.setAction(new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                BitBoard bitBoard = new BitBoard(true);
+                BitBoard bitBoard = BitBoard.make_bitboard_empty();
                 for (int i = 0; i < 64; i++) {
                         Icon icon = Edit.buttons[i].getIcon();
                         String name = icon.toString();
                         if (!Objects.equals(name, "Icons/_W.png") && !Objects.equals(name, "Icons/_B.png")) {
+                            char[] symbols = {'P','R','N','B','Q','K'};
 
                             if (name.toCharArray()[6] == 'W') {
-                                if (name.toCharArray()[7] == 'P')
-                                    bitBoard.WHITE_PAWN |= 1L << i;
-                                if (name.toCharArray()[7] == 'R')
-                                    bitBoard.WHITE_ROOK |= 1L << i;
-                                if (name.toCharArray()[7] == 'N')
-                                    bitBoard.WHITE_KNIGHT |= 1L << i;
-                                if (name.toCharArray()[7] == 'B')
-                                    bitBoard.WHITE_BISHOP |= 1L << i;
-                                if (name.toCharArray()[7] == 'Q')
-                                    bitBoard.WHITE_QUEEN |= 1L << i;
-                                if (name.toCharArray()[7] == 'K')
-                                    bitBoard.WHITE_KING |= 1L << i;
-                            }
-                            else {
-                                if (name.toCharArray()[7] == 'P')
-                                    bitBoard.BLACK_PAWN |= 1L << i;
-                                if (name.toCharArray()[7] == 'R')
-                                    bitBoard.BLACK_ROOK |= 1L << i;
-                                if (name.toCharArray()[7] == 'N')
-                                    bitBoard.BLACK_KNIGHT |= 1L << i;
-                                if (name.toCharArray()[7] == 'B')
-                                    bitBoard.BLACK_BISHOP |= 1L << i;
-                                if (name.toCharArray()[7] == 'Q')
-                                    bitBoard.BLACK_QUEEN |= 1L << i;
-                                if (name.toCharArray()[7] == 'K')
-                                    bitBoard.BLACK_KING |= 1L << i;
+                                for (int j = 0; j < 6; j++)
+                                    if (name.toCharArray()[7] == symbols[j])
+                                        bitBoard.white[j] = BitUtils.setBit(bitBoard.white[j], i);
+                            }else
+                                        for (int j = 0; j < 6; j++)
+                                            if (name.toCharArray()[7] == symbols[j])
+                                                bitBoard.black[j] = BitUtils.setBit(bitBoard.black[j],i);
+
                             }
                         }
-
-                    }
-
-                Game.bitBoard = new BitBoard(bitBoard);
-                Move.bitBoard = new BitBoard(bitBoard);
+                Game.bitBoard = BitBoard.make_bitboard_from(bitBoard);
+                Move.bitBoard = BitBoard.make_bitboard_from(bitBoard);
                 Move.updatePosition();
             }
         });

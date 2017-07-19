@@ -1,17 +1,17 @@
 import javax.swing.*;
 import java.util.ArrayList;
-import java.util.Random;
+import static Util.BitUtils.*;
 
 public class Game {
 
-    static BitBoard bitBoard = new BitBoard();
-    static long[][] zKeys = new long[16][64];
+    static BitBoard bitBoard = BitBoard.make_bitboard_start();
 
     public static void main(String[] args) throws InterruptedException {
-        genZObristKeys();
+        BitBoard.genZObristKeys();
         Mask.calculating();
-       bitBoard = new BitBoard();
-       Move.bitBoard = new BitBoard(bitBoard);
+        Eval.calculate();
+       bitBoard = BitBoard.make_bitboard_start();
+       Move.bitBoard = BitBoard.make_bitboard_from(bitBoard);
        new Gui().setVisible(true);
        new Editor().setVisible(true);
        Move.updatePosition();
@@ -20,7 +20,7 @@ public class Game {
        start();
     }
 
-    static void start() throws InterruptedException {
+    private static void start() throws InterruptedException {
         while (true){
             System.out.println();
             int move;
@@ -30,19 +30,19 @@ public class Game {
             }
             move = Move.move;
             Move.move = null;
-            bitBoard = makeMove(new BitBoard(bitBoard),move);
+            bitBoard = makeMove(BitBoard.make_bitboard_from(bitBoard),move);
 
             if (checkEnd(false))
                 break;
 
             long st = System.currentTimeMillis();
 
-            int num = AI.bfs(new BitBoard(bitBoard,false),6);
+            int num = AI.bfs(BitBoard.make_bitboard_from(bitBoard),6);
 
             long secondTime = System.currentTimeMillis() - st;
             System.out.println("Время на ход: " + secondTime);
 
-            bitBoard = makeMove(new BitBoard(bitBoard),num);
+            bitBoard = makeMove(BitBoard.make_bitboard_from(bitBoard),num);
 
             if (checkEnd(true))
                 break;
@@ -52,9 +52,9 @@ public class Game {
 
     }
 
-    static boolean checkEnd(boolean white){
+    private static boolean checkEnd(boolean white){
         Move.sounds("Sounds/whiteTurn.wav");
-        Move.bitBoard = new BitBoard(bitBoard);
+        Move.bitBoard = BitBoard.make_bitboard_from(bitBoard);
         Move.updatePosition();
         if (bitBoard.isCheckMateTo(false)){
             JOptionPane.showMessageDialog(null, "Мат! Вы победили!");
@@ -77,22 +77,15 @@ public class Game {
         return false;
     }
 
-    static void genZObristKeys(){
-        Random rand = new Random();
-        for (int i = 0; i < 12; i++)
-            for (int j = 0; j < 64; j++)
-            zKeys[i][j] = rand.nextLong();
-    }
-
     static boolean makeLegalMove(BitBoard bitBoard,int move2){
         try {
-            for (int move : bitBoard.getMoves(true, null))
+            for (int move : bitBoard.getMoves(true))
                 if (move == move2) {
                     makeMove(bitBoard, move);
-                    boolean have = bitBoard.WHITE_KING != 0;
-                    ArrayList<Integer> validMove = bitBoard.getMoves(false, null);
+                    boolean have = bitBoard.white[king] != 0;
+                    ArrayList<Integer> validMove = bitBoard.getMoves(false);
                     makeMove(bitBoard, validMove.get(0));
-                    return have && bitBoard.WHITE_KING != 0;
+                    return have && bitBoard.white[king] != 0;
                 }
         }
         catch (IndexOutOfBoundsException e){
@@ -101,49 +94,42 @@ public class Game {
         return false;
     }
 
-    static void kill(BitBoard bitBoard, boolean white, int to){
-        if (white){
-            bitBoard.WHITE_PAWN &= ~(1L << to);
-            bitBoard.WHITE_ROOK &= ~(1L << to);
-            bitBoard.WHITE_KNIGHT &= ~(1L << to);
-            bitBoard.WHITE_QUEEN &= ~(1L << to);
-            bitBoard.WHITE_KING &= ~(1L << to);
-            bitBoard.WHITE_BISHOP &= ~(1L << to);
-        }
-        else {
-            bitBoard.BLACK_PAWN &= ~(1L << to);
-            bitBoard.BLACK_ROOK &= ~(1L << to);
-            bitBoard.BLACK_KNIGHT &= ~(1L << to);
-            bitBoard.BLACK_QUEEN &= ~(1L << to);
-            bitBoard.BLACK_KING &= ~(1L << to);
-            bitBoard.BLACK_BISHOP &= ~(1L << to);
-        }
+    private static void kill(BitBoard bitBoard, boolean white, int to){
+        if (white)
+            for (int i = 0; i < 6; i++)
+                zeroBit(bitBoard.white[i],to);
+        else
+            for (int i = 0; i < 6; i++)
+                zeroBit(bitBoard.black[i],to);
     }
 
-    static void update_rotated_bitboards(BitBoard bitBoard,int from, int to, Integer zeroing){
-        bitBoard.ALL ^= Mask.cell_default[from];
-        bitBoard.ALL_ROTATED_45_LEFT ^= Mask.cell_rotated_45_left[from];
-        bitBoard.ALL_ROTATED_45_RIGHT ^= Mask.cell_rotated_45_right[from];
-        bitBoard.ALL_ROTATED_90 ^= Mask.cell_rotated_90[from];
-        bitBoard.ALL |= Mask.cell_default[to];
-        bitBoard.ALL_ROTATED_45_LEFT |= Mask.cell_rotated_45_left[to];
-        bitBoard.ALL_ROTATED_45_RIGHT |= Mask.cell_rotated_45_right[to];
-        bitBoard.ALL_ROTATED_90 |= Mask.cell_rotated_90[to];
+    private static void update_rotated_bitboards(BitBoard bitBoard, int from, int to, Integer zeroing){
+        bitBoard.all[0] ^= Mask.cell_default[from];
+        bitBoard.all[1] ^= Mask.cell_rotated_45_left[from];
+        bitBoard.all[2] ^= Mask.cell_rotated_45_right[from];
+        bitBoard.all[3] ^= Mask.cell_rotated_90[from];
+        bitBoard.all[0] |= Mask.cell_default[to];
+        bitBoard.all[1] |= Mask.cell_rotated_45_left[to];
+        bitBoard.all[2] |= Mask.cell_rotated_45_right[to];
+        bitBoard.all[3] |= Mask.cell_rotated_90[to];
         if (zeroing!=null) {
-            bitBoard.ALL &= ~(1L << Mask.cell_default[zeroing]);
-            bitBoard.ALL_ROTATED_45_LEFT &= ~(1L << Mask.cell_rotated_45_left[zeroing]);
-            bitBoard.ALL_ROTATED_45_RIGHT &= ~(1L << Mask.cell_rotated_45_right[zeroing]);
-            bitBoard.ALL_ROTATED_90 &= ~(1L << Mask.cell_rotated_90[zeroing]);
+            bitBoard.all[0] &= ~Mask.cell_default[zeroing];
+            bitBoard.all[1] &= ~Mask.cell_rotated_45_left[zeroing];
+            bitBoard.all[2] &= ~Mask.cell_rotated_45_right[zeroing];
+            bitBoard.all[3] &= ~Mask.cell_rotated_90[zeroing];
         }
     }
 
-    static void update_rotated_bitboards_castling(BitBoard bitBoard,int n){
-        int castle[][] = {{3, 0},{3, 7},{59, 56},{59, 63}};
-            bitBoard.ALL ^= Mask.cell_default[castle[n][1]] | Mask.cell_default[castle[n][0]];
-            bitBoard.ALL_ROTATED_45_LEFT ^= Mask.cell_rotated_45_left[castle[n][1]]|  Mask.cell_rotated_45_left[castle[n][0]];
-            bitBoard.ALL_ROTATED_45_RIGHT ^= Mask.cell_rotated_45_right[castle[n][1]] | Mask.cell_rotated_45_right[castle[n][0]];
-            bitBoard.ALL_ROTATED_90 ^= Mask.cell_rotated_90[castle[n][1]] | Mask.cell_rotated_90[castle[n][0]];
+    private static int castle[][] = {{3, 0},{3, 7},{59, 56},{59, 63}};
+
+    private static void update_rotated_bitboards_castling(BitBoard bitBoard, int n){
+            bitBoard.all[0] ^= Mask.cell_default[castle[n][1]] | Mask.cell_default[castle[n][0]];
+            bitBoard.all[1] ^= Mask.cell_rotated_45_left[castle[n][1]]|  Mask.cell_rotated_45_left[castle[n][0]];
+            bitBoard.all[2] ^= Mask.cell_rotated_45_right[castle[n][1]] | Mask.cell_rotated_45_right[castle[n][0]];
+            bitBoard.all[3] ^= Mask.cell_rotated_90[castle[n][1]] | Mask.cell_rotated_90[castle[n][0]];
     }
+
+
 
 
     static BitBoard makeMove(BitBoard bitBoard,int move){
@@ -151,166 +137,111 @@ public class Game {
         int figure =  15 & (move >> 3);
         int from = move>>13, to = (move>>7) & 63;
         boolean isTurnWhite = figure < 7;
+        bitBoard.lastMove = (byte)to;
         //превращение пешки
         if (promotion != 0) {
             if (isTurnWhite) {
-                bitBoard.WHITE_PAWN &= ~(1L << from);
-                if (to / 8 == 3)
-                    bitBoard.WHITE_ROOK |= 1L << 56 + to % 8;
-                if (to / 8 == 4)
-                    bitBoard.WHITE_KNIGHT |= 1L << 56 + to % 8;
-                if (to / 8 == 5)
-                    bitBoard.WHITE_BISHOP |= 1L << 56 + to % 8;
-                if (to / 8 == 6)
-                    bitBoard.WHITE_QUEEN |= 1L << 56 + to % 8;
+                bitBoard.white[pawn] = zeroBit(bitBoard.white[pawn],from);
+                if (promotion == 1)
+                    bitBoard.white[queen] = setBit(bitBoard.white[queen],56 + to % 8);
+                else if (promotion == 2)
+                    bitBoard.white[rook] = setBit(bitBoard.white[rook],56 + to % 8);
+                else if (promotion == 3)
+                    bitBoard.white[knight] = setBit(bitBoard.white[knight],56 + to % 8);
+                else if (promotion == 4)
+                    bitBoard.white[bishop] = setBit(bitBoard.white[bishop],56 + to % 8);
                 kill(bitBoard, false, 56 + to % 8);
             } else {
-                bitBoard.BLACK_PAWN &= ~(1L << from);
-                if (to / 8 == 3)
-                    bitBoard.BLACK_ROOK |= 1L << to % 8;
-                if (to / 8 == 4)
-                    bitBoard.BLACK_KNIGHT |= 1L << to % 8;
-                if (to / 8 == 5)
-                    bitBoard.BLACK_BISHOP |= 1L << to % 8;
-                if (to / 8 == 6)
-                    bitBoard.BLACK_QUEEN |= 1L << to % 8;
+                bitBoard.black[pawn] = zeroBit(bitBoard.black[pawn],from);
+                if (promotion == 1)
+                    bitBoard.black[queen] = setBit(bitBoard.black[queen],to % 8);
+                else if (promotion == 2)
+                    bitBoard.black[rook] = setBit(bitBoard.black[rook],to % 8);
+                else if (promotion == 3)
+                    bitBoard.black[knight] = setBit(bitBoard.black[knight],to % 8);
+                else if (promotion == 4)
+                    bitBoard.black[bishop] = setBit(bitBoard.black[bishop],to % 8);
                 kill(bitBoard, true, to % 8);
             }
-            bitBoard.PASS = 0;
+            bitBoard.pass = 0;
             update_rotated_bitboards(bitBoard,from,to,null);
             return bitBoard;
         }
         //рокировка
-        if (from==3 && figure == 6 && Math.abs(from-to)==2){
-            bitBoard.WHITE_KING &= ~(1L << from);
-            bitBoard.WHITE_KING |= 1L << to;
+        if (from==3 && figure == white_king && Math.abs(from-to)==2){
+            bitBoard.white[king] = zeroBit(bitBoard.white[king],from);
+            bitBoard.white[king] = setBit(bitBoard.white[king],to);
             if (to==1) {
-                bitBoard.WHITE_ROOK ^= 0b101;
+                bitBoard.white[rook] ^= 0b101;
                 update_rotated_bitboards_castling(bitBoard, 0);
             }
             else {
-                bitBoard.WHITE_ROOK ^= 0b10010000;
+                bitBoard.white[rook] ^= 0b10010000;
                 update_rotated_bitboards_castling(bitBoard, 1);
             }
-            bitBoard.PASS = 0;
-            bitBoard.CASTLE &= ~(1L << 3);
-            bitBoard.CASTLE &= ~(1L << 2);
+            bitBoard.pass = 0;
+            bitBoard.castle = zeroBit(bitBoard.castle,3);
+            bitBoard.castle = zeroBit(bitBoard.castle,2);
             return bitBoard;
         }
-        if (from==59 && figure == 12 && Math.abs(from-to)==2){
-            bitBoard.BLACK_KING &= ~(1L << from);
-            bitBoard.BLACK_KING |= 1L << to;
+        if (from==59 && figure == black_king && Math.abs(from-to)==2){
+            bitBoard.black[king] = zeroBit(bitBoard.black[king],from);
+            bitBoard.black[king] = setBit(bitBoard.black[king],to);
             if (to==57) {
-                bitBoard.BLACK_ROOK ^= 0b101 << 56;
+                bitBoard.black[rook] ^= 0b101L << 56;
                 update_rotated_bitboards_castling(bitBoard, 2);
             }
             else {
-                bitBoard.BLACK_ROOK ^= 0b10010000 << 56;
+                bitBoard.black[rook] ^= 0b10010000L << 56;
                 update_rotated_bitboards_castling(bitBoard, 3);
             }
-            bitBoard.PASS = 0;
-            bitBoard.CASTLE &= ~(1L << 1);
-            bitBoard.CASTLE &= ~1L;
+            bitBoard.pass = 0;
+            bitBoard.castle = zeroBit(bitBoard.castle,1);
+            bitBoard.castle = zeroBit(bitBoard.castle,0);
             return bitBoard;
         }
 
         //взятие на проходе
-        if (figure == 1 && ((bitBoard.PASS >> to) & 1) != 0){
-            bitBoard.WHITE_PAWN &= ~(1L << from);
-            bitBoard.WHITE_PAWN |= 1L << to;
-            bitBoard.BLACK_PAWN &= (~1L << to+8);
-            bitBoard.PASS = 0;
+        if (figure == white_pawn && ((bitBoard.pass >> to) & 1) != 0){
+            bitBoard.white[pawn] = zeroBit(bitBoard.white[pawn],from);
+            bitBoard.white[pawn] = setBit(bitBoard.white[pawn],to);
+            bitBoard.black[pawn] = zeroBit(bitBoard.black[pawn],to + 8);
+            bitBoard.pass = 0;
             update_rotated_bitboards(bitBoard,from,to,to+8);
             return bitBoard;
         }
-        if (figure == 7 && ((bitBoard.PASS >> to) & 1) != 0){
-            bitBoard.BLACK_PAWN &= ~(1L << from);
-            bitBoard.BLACK_PAWN |= 1L << to;
-            bitBoard.WHITE_PAWN &= ~(1L << to-8);
-            bitBoard.PASS = 0;
+        if (figure == black_pawn && ((bitBoard.pass >> to) & 1) != 0){
+            bitBoard.black[pawn] = zeroBit(bitBoard.black[pawn],from);
+            bitBoard.black[pawn] = setBit(bitBoard.black[pawn],to);
+            bitBoard.white[pawn] = zeroBit(bitBoard.white[pawn],to - 8);
+            bitBoard.pass = 0;
             update_rotated_bitboards(bitBoard,from,to,to-8);
             return bitBoard;
         }
 
         //обычный ход
-        if (figure == 2){
-            if (from == 0)
-                bitBoard.CASTLE &= ~(1L << 3);
-            else if (from == 7)
-                bitBoard.CASTLE &= ~(1L << 2);
-        }
-        if (figure == 6){
-            bitBoard.CASTLE &= ~(1L << 3);
-            bitBoard.CASTLE &= ~(1L << 2);
-        }
+        if (figure == white_rook && from == 0 || figure == white_king)
+            bitBoard.castle = zeroBit(bitBoard.castle,3);
+        if (figure == white_rook && from == 7 || figure == white_king)
+            bitBoard.castle = zeroBit(bitBoard.castle,2);
 
-        if (figure == 8){
-            if (from == 56)
-                bitBoard.CASTLE &= ~(1L << 1);
-            else if (from == 63)
-                bitBoard.CASTLE &= ~1L;
-        }
-        if (figure == 12){
-            bitBoard.CASTLE &= ~(1L << 1);
-            bitBoard.CASTLE &= ~1L;
-        }
+        if (figure == black_rook && from == 56 || figure == black_king)
+            bitBoard.castle = zeroBit(bitBoard.castle,1);
+        if (figure == black_rook && from == 63 || figure == black_king)
+            bitBoard.castle = zeroBit(bitBoard.castle,0);
 
-        bitBoard.PASS = 0;
+        bitBoard.pass = 0;
 
-        if (Math.abs(from-to)==16 && (from/8 == 6 && ((bitBoard.BLACK_PAWN >> from) & 1) != 0 || from/8 == 1 && (((bitBoard.WHITE_PAWN >> from) & 1) != 0)))
-            bitBoard.PASS |= 1L << (to - ((from/8 == 1) ? 8:-8));
+        if (Math.abs(from-to)==16 && (from/8 == 6 && getBit(bitBoard.black[pawn],from) || from/8 == 1 && getBit(bitBoard.white[pawn],from)))
+            bitBoard.pass = setBit(bitBoard.pass,to - ((from/8 == 1) ? 8:-8));
 
         if (isTurnWhite){
-            if (figure == 1){
-                bitBoard.WHITE_PAWN &= ~(1L << from);
-                bitBoard.WHITE_PAWN |= 1L << to;
-            }
-            else if (figure == 2){
-                bitBoard.WHITE_ROOK &= ~(1L << from);
-                bitBoard.WHITE_ROOK |= 1L << to;
-            }
-            else if (figure == 3){
-                bitBoard.WHITE_KNIGHT &= ~(1L << from);
-                bitBoard.WHITE_KNIGHT |= 1L << to;
-            }
-            else if (figure == 4){
-                bitBoard.WHITE_BISHOP &= ~(1L << from);
-                bitBoard.WHITE_BISHOP |= 1L << to;
-            }
-            else if (figure == 5){
-                bitBoard.WHITE_QUEEN &= ~(1L << from);
-                bitBoard.WHITE_QUEEN |= 1L << to;
-            }
-            else if (figure == 6){
-                bitBoard.WHITE_KING &= ~(1L << from);
-                bitBoard.WHITE_KING |= 1L << to;
-            }
+            bitBoard.white[figure-1] = zeroBit(bitBoard.white[figure-1],from);
+            bitBoard.white[figure-1] = setBit(bitBoard.white[figure-1],to);
             kill(bitBoard,false,to);
         } else {
-            if (figure == 7){
-                bitBoard.BLACK_PAWN &= ~(1L << from);
-                bitBoard.BLACK_PAWN |= 1L << to;
-            }
-            else if (figure == 8){
-                bitBoard.BLACK_ROOK &= ~(1L << from);
-                bitBoard.BLACK_ROOK |= 1L << to;
-            }
-            else if (figure == 9){
-                bitBoard.BLACK_KNIGHT &= ~(1L << from);
-                bitBoard.BLACK_KNIGHT |= 1L << to;
-            }
-            else if (figure == 10){
-                bitBoard.BLACK_BISHOP &= ~(1L << from);
-                bitBoard.BLACK_BISHOP |= 1L << to;
-            }
-            else if (figure == 11){
-                bitBoard.BLACK_QUEEN &= ~(1L << from);
-                bitBoard.BLACK_QUEEN |= 1L << to;
-            }
-            else if (figure == 12){
-                bitBoard.BLACK_KING &= ~(1L << from);
-                bitBoard.BLACK_KING |= 1L << to;
-            }
+            bitBoard.black[figure-7] = zeroBit(bitBoard.black[figure-7],from);
+            bitBoard.black[figure-7] = setBit(bitBoard.black[figure-7],to);
             kill(bitBoard,true,to);
         }
         update_rotated_bitboards(bitBoard,from,to,null);

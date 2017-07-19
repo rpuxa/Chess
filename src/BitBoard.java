@@ -1,113 +1,78 @@
+import Util.BitUtils;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Random;
 
-public class BitBoard {
-    long WHITE_PAWN;
-    long WHITE_KNIGHT;
-    long WHITE_ROOK;
-    long WHITE_BISHOP;
-    long WHITE_QUEEN;
-    long WHITE_KING;
-    long BLACK_PAWN;
-    long BLACK_KNIGHT;
-    long BLACK_ROOK;
-    long BLACK_BISHOP;
-    long BLACK_QUEEN;
-    long BLACK_KING;
-    long PASS;
-    byte CASTLE;
-    long ALL;
-    long ALL_ROTATED_90;
-    long ALL_ROTATED_45_LEFT;
-    long ALL_ROTATED_45_RIGHT;
+import static Util.BitUtils.*;
+
+class BitBoard {
+    long[] white;
+    long[] black;
+    long pass;
+    byte castle;
+    long[] all;
+    byte lastMove;
 
 
-    BitBoard(boolean empty){
-        WHITE_PAWN = 0;
-        WHITE_KNIGHT = 0;
-        WHITE_ROOK = 0;
-        WHITE_BISHOP = 0;
-        WHITE_QUEEN = 0;
-        WHITE_KING = 0;
-        BLACK_PAWN = 0;
-        BLACK_KNIGHT = 0;
-        BLACK_ROOK = 0;
-        BLACK_BISHOP = 0;
-        BLACK_QUEEN = 0;
-        BLACK_KING = 0;
-        PASS = 0;
-        CASTLE = 0b1111;
-        ALL = 0;
-        ALL_ROTATED_90 = 0;
-        ALL_ROTATED_45_LEFT = 0;
-        ALL_ROTATED_45_RIGHT = 0;
+    BitBoard(long[] white,long[] black, long pass, byte castle, long[] all, byte lastMove){
+        this.white = white.clone();
+        this.black = black.clone();
+        this.pass= pass;
+        this.castle = castle;
+        this.all = all.clone();
+        this.lastMove = lastMove;
     }
 
-    BitBoard(){
-        WHITE_PAWN = 0b1111111100000000;
-        WHITE_KNIGHT = 0b1000010;
-        WHITE_ROOK = 0b10000001;
-        WHITE_BISHOP = 0b100100;
-        WHITE_QUEEN = 0b10000;
-        WHITE_KING = 0b1000;
-        BLACK_PAWN = WHITE_PAWN<<40;
-        BLACK_KNIGHT = WHITE_KNIGHT<<56;
-        BLACK_ROOK = WHITE_ROOK<<56;
-        BLACK_BISHOP = WHITE_BISHOP<<56;
-        BLACK_QUEEN = WHITE_QUEEN<<56;
-        BLACK_KING = WHITE_KING<<56;
-        PASS = 0;
-        CASTLE = 0b1111;
-        rotate();
-    }
-    BitBoard(BitBoard bitBoard) {
-        WHITE_PAWN = bitBoard.WHITE_PAWN;
-        WHITE_KNIGHT = bitBoard.WHITE_KNIGHT;
-        WHITE_ROOK = bitBoard.WHITE_ROOK;
-        WHITE_BISHOP = bitBoard.WHITE_BISHOP;
-        WHITE_QUEEN = bitBoard.WHITE_QUEEN;
-        WHITE_KING = bitBoard.WHITE_KING;
-        BLACK_PAWN = bitBoard.BLACK_PAWN;
-        BLACK_KNIGHT = bitBoard.BLACK_KNIGHT;
-        BLACK_ROOK = bitBoard.BLACK_ROOK;
-        BLACK_BISHOP = bitBoard.BLACK_BISHOP;
-        BLACK_QUEEN = bitBoard.BLACK_QUEEN;
-        BLACK_KING = bitBoard.BLACK_KING;
-        PASS = bitBoard.PASS;
-        CASTLE = bitBoard.CASTLE;
-        rotate();
-    }
-    BitBoard(BitBoard bitBoard, boolean nullMove) {
-        WHITE_PAWN = bitBoard.WHITE_PAWN;
-        WHITE_KNIGHT = bitBoard.WHITE_KNIGHT;
-        WHITE_ROOK = bitBoard.WHITE_ROOK;
-        WHITE_BISHOP = bitBoard.WHITE_BISHOP;
-        WHITE_QUEEN = bitBoard.WHITE_QUEEN;
-        WHITE_KING = bitBoard.WHITE_KING;
-        BLACK_PAWN = bitBoard.BLACK_PAWN;
-        BLACK_KNIGHT = bitBoard.BLACK_KNIGHT;
-        BLACK_ROOK = bitBoard.BLACK_ROOK;
-        BLACK_BISHOP = bitBoard.BLACK_BISHOP;
-        BLACK_QUEEN = bitBoard.BLACK_QUEEN;
-        BLACK_KING = bitBoard.BLACK_KING;
-        CASTLE = bitBoard.CASTLE;
-        rotate();
+    private static long[][] zKeys = new long[12][64];
+
+    static void genZObristKeys(){
+        Random rand = new Random();
+        for (int i = 0; i < 12; i++)
+            for (int j = 0; j < 64; j++)
+                zKeys[i][j] = rand.nextLong();
     }
 
-    void rotate(){
-        ALL = WHITE_PAWN | WHITE_KNIGHT | WHITE_ROOK | WHITE_BISHOP | WHITE_QUEEN | WHITE_KING | BLACK_PAWN | BLACK_KNIGHT | BLACK_ROOK | BLACK_BISHOP | BLACK_QUEEN | BLACK_KING;
+    static BitBoard make_bitboard_empty(){
+        return new BitBoard(new long[6],new long[6],0,(byte)0b1111,new long[4],(byte)0);
+    }
+
+    static BitBoard make_bitboard_start(){
+        long[] white = {0b1111111100000000,0b10000001,0b1000010,0b100100,0b10000,0b1000};
+        long[] black = {0b1111111100000000L << 40,0b10000001L << 56,0b1000010L << 56,0b100100L << 56,0b10000L << 56,0b1000L << 56};
+        long[] all = all_calculate(white,black);
+        return new BitBoard(white,black,0,(byte)0b1111,all,(byte)0);
+    }
+
+    static BitBoard make_bitboard_from(BitBoard bitBoard){
+        return new BitBoard(bitBoard.white,bitBoard.black,bitBoard.pass,bitBoard.castle,bitBoard.all,bitBoard.lastMove);
+    }
+
+    static BitBoard make_bitboard_nullMove_from(BitBoard bitBoard){
+        return new BitBoard(bitBoard.white,bitBoard.black,0,bitBoard.castle,bitBoard.all,bitBoard.lastMove);
+    }
+
+    private static long[] all_calculate(long[] white, long[] black){
+        long all = 0;
+        long all_rotated_90 = 0;
+        long all_rotated_45_left = 0;
+        long all_rotated_45_right = 0;
+
+        for (int i = 0; i < 6; i++)
+            all |= white[i] | black[i];
+
         for (int x = 0; x < 8; x++)
             for (int y = 0; y < 8; y++)
-                if (((ALL >> (8*y+x)) & 1) != 0) {
-                    ALL_ROTATED_90 |= 1L << 8 * (7 - x) + y;
-                }
+                if (getBit(all,8*y+x))
+                    all_rotated_90 = setBit(all_rotated_90,8 * (7 - x) + y);
+
         int n = 0;
         for (int i = 0; i < 8; i++) {
             int m = 0;
             for (int j = 7 - i; j <= 7; j++){
-                if (((ALL >> j+8*m) & 1) != 0)
-                    ALL_ROTATED_45_LEFT |= 1L << n;
+                if (getBit(all,j+8*m))
+                    all_rotated_45_left = setBit(all_rotated_45_left,n);
                 m++;
                 n++;
             }
@@ -116,8 +81,8 @@ public class BitBoard {
             int m = 0;
             for (int j = 7 - i; j <= 7; j++){
                 if (j+8*m>-1 && j+8*m<64 && (j+8*m)/8>(j+8*m)%8) {
-                    if (((ALL >> j+8*m) & 1) != 0)
-                        ALL_ROTATED_45_LEFT |= 1L << n;
+                    if (getBit(all,j+8*m))
+                        all_rotated_45_left = setBit(all_rotated_45_left,n);
                     n++;
                 }
                 m++;
@@ -129,8 +94,8 @@ public class BitBoard {
         for (int i = 0; i < 8; i++) {
             int m = 8*i;
             for (int j = 0; j <= i; j++){
-                if (((ALL >> j+m) & 1) != 0)
-                    ALL_ROTATED_45_RIGHT |= 1L << n;
+                if (getBit(all,j+m))
+                    all_rotated_45_right = setBit(all_rotated_45_right,n);
                 m-=8;
                 n++;
             }
@@ -139,8 +104,8 @@ public class BitBoard {
             int m = 8*i;
             for (int j = 0; j <= i; j++){
                 if (j+m>-1 && j+m<64 && (j+m)/8+(j+m)%8>7) {
-                    if (((ALL >> j+m) & 1) != 0)
-                        ALL_ROTATED_45_RIGHT |= 1L << n;
+                    if (getBit(all,j+m))
+                        all_rotated_45_right = setBit(all_rotated_45_right,n);
                     n++;
                     if (j+m == 63)
                         break label;
@@ -148,118 +113,103 @@ public class BitBoard {
                 m-=8;
             }
         }
+        return new long[]{all,all_rotated_90,all_rotated_45_left,all_rotated_45_right};
     }
 
     long getKey() {
-        long WHITE = WHITE_PAWN | WHITE_KNIGHT | WHITE_ROOK | WHITE_BISHOP | WHITE_QUEEN | WHITE_KING;
-        long BLACK = BLACK_PAWN | BLACK_KNIGHT | BLACK_ROOK | BLACK_BISHOP | BLACK_QUEEN | BLACK_KING;
         long hash = 0L;
-            for (int i = 0; i < 64; i++)
-                if ((((WHITE | BLACK) >> i) & 1) != 0){
-                if (((WHITE_PAWN >> i) & 1) != 0)
-                    hash ^= Game.zKeys[0][i];
-                else if (((WHITE_ROOK >> i) & 1) != 0)
-                    hash ^= Game.zKeys[1][i];
-                else if (((WHITE_BISHOP >> i) & 1) != 0)
-                    hash ^= Game.zKeys[2][i];
-                else if (((WHITE_KNIGHT >> i) & 1) != 0)
-                    hash ^= Game.zKeys[3][i];
-                else if (((WHITE_QUEEN >> i) & 1) != 0)
-                    hash ^= Game.zKeys[4][i];
-                else if (((WHITE_KING >> i) & 1) != 0)
-                    hash ^= Game.zKeys[5][i];
-
-                else if (((BLACK_PAWN >> i) & 1) != 0)
-                    hash ^= Game.zKeys[6][i];
-                else if (((BLACK_ROOK >> i) & 1) != 0)
-                    hash ^= Game.zKeys[7][i];
-                else if (((BLACK_BISHOP >> i) & 1) != 0)
-                    hash ^= Game.zKeys[8][i];
-                else if (((BLACK_KNIGHT >> i) & 1) != 0)
-                    hash ^= Game.zKeys[9][i];
-                else if (((BLACK_QUEEN >> i) & 1) != 0)
-                    hash ^= Game.zKeys[10][i];
-                else if (((BLACK_KING >> i) & 1) != 0)
-                    hash ^= Game.zKeys[11][i];
+            for (int i = 0; i < 64; i++){
+                for (int j = 0; j < 6; j++)
+                    if (getBit(white[j],i))
+                        hash ^= zKeys[j][i];
+                for (int j = 6; j < 12; j++)
+                    if (getBit(black[j-6],i))
+                        hash ^= zKeys[j][i];
             }
             return hash;
     }
 
-    void add(ArrayList<Integer> moves,int pos, long mask,int figureMove) {
+    private void add(ArrayList<Integer> moves, int pos, long mask, int figureMove) {
         add(moves,pos,mask,figureMove,false);
     }
-    void add(ArrayList<Integer> moves,int pos, long mask,int figureMove,boolean promotion) {
+
+    private static final short figures[] = {1,2,3,4};
+
+    private void add(ArrayList<Integer> moves, int pos, long mask, int figureMove, boolean promotion) {
         if (mask != 0)
             for (int i = 0; i < 64; i++)
                 if (((mask >> i) & 1) != 0)
                     if (!promotion) {
                         moves.add(((((pos << 6) + i) << 4) + figureMove) << 3);
                     } else {
-                        final short figures[] = {1,2,3,4};
                         for (short figure :figures)
                             moves.add((((((pos << 6) + i) << 4) + figureMove) << 3) + figure);
                     }
     }
 
-    ArrayList<Integer> getMoves(boolean isTurnWhite, int[] kill){
-       return getMoves(isTurnWhite,kill,false);
+    ArrayList<Integer> getMoves(boolean isTurnWhite){
+       return getMoves(isTurnWhite,false);
     }
 
-    ArrayList<Integer> getMoves(boolean isTurnWhite,int[] kill, boolean capture) {
+    ArrayList<Integer> getMoves(boolean isTurnWhite, boolean capture) {
         ArrayList<Integer> moves = new ArrayList<>();
-        long WHITE = WHITE_PAWN | WHITE_KNIGHT | WHITE_ROOK | WHITE_BISHOP | WHITE_QUEEN | WHITE_KING;
-        long BLACK = BLACK_PAWN | BLACK_KNIGHT | BLACK_ROOK | BLACK_BISHOP | BLACK_QUEEN | BLACK_KING;
+        int color = 1 + ((isTurnWhite) ? 0 : 6);
+        int pawn_block = 8 * ((isTurnWhite) ? 1 : -1);
+        long[] ourFigures = (isTurnWhite) ? white:black;
+        long[] enemyFigures = (!isTurnWhite) ? white:black;
+        long ourFiguresMask = ourFigures[pawn] | ourFigures[rook] | ourFigures[knight] | ourFigures[bishop] | ourFigures[queen] | ourFigures[king];
+        long enemyFiguresMask = enemyFigures[pawn] | enemyFigures[rook] | enemyFigures[knight] | enemyFigures[bishop] | enemyFigures[queen] | enemyFigures[king];
+        long captureMask = (capture) ? enemyFiguresMask : -1;
         for (int i = 0; i < 64; i++) {
-            boolean queen = ((((isTurnWhite) ? WHITE_QUEEN : BLACK_QUEEN) >> i) & 1) != 0;
-            if (((WHITE >> i) & 1) != 0 && isTurnWhite || ((BLACK >> i) & 1) != 0 && !isTurnWhite) {
-                if (((((isTurnWhite) ? WHITE_PAWN : BLACK_PAWN) >> i) & 1) != 0) {
-                    if (((ALL >> i + 8 * ((isTurnWhite) ? 1 : -1)) & 1) == 0) {
-                        add(moves, i, ((isTurnWhite) ? Mask.white_pawn_move[i] : Mask.black_pawn_move[i]) & ~ALL & ((capture) ? ((isTurnWhite) ? BLACK : WHITE) : -1),1+((isTurnWhite) ? 0:6), i / 8 == ((isTurnWhite) ? 6 : 1));
+            boolean isQueen = getBit(ourFigures[queen],i);
+            if (getBit(ourFiguresMask,i)) {
+                if (getBit(ourFigures[pawn],i)) {
+                    boolean promotion = i / 8 == ((isTurnWhite) ? 6 : 1);
+                    if (!getBit(all[0],i + pawn_block)) {
+                        add(moves, i, ((isTurnWhite) ? Mask.white_pawn_move[i] : Mask.black_pawn_move[i]) & ~all[0] & captureMask,pawn+color, promotion);
                     }
-                    add(moves, i, ((isTurnWhite) ? Mask.white_pawn_Mask[i] : Mask.black_pawn_Mask[i]) & ((isTurnWhite) ? BLACK : WHITE) | PASS,1+((isTurnWhite) ? 0:6), i / 8 == ((isTurnWhite) ? 6 : 1));
-                } else if (((((isTurnWhite) ? WHITE_KNIGHT : BLACK_KNIGHT) >> i) & 1) != 0)
-                    add(moves, i, Mask.knight[i] & ((isTurnWhite) ? ~WHITE : ~BLACK) & ((capture) ? ((isTurnWhite) ? BLACK : WHITE) : -1),3+((isTurnWhite) ? 0:6));
-                else if (((((isTurnWhite) ? WHITE_KING : BLACK_KING) >> i) & 1) != 0) {
-                    add(moves, i, Mask.king[i] & ((isTurnWhite) ? ~WHITE : ~BLACK) & ((capture) ? ((isTurnWhite) ? BLACK : WHITE) : -1),6+((isTurnWhite) ? 0:6));
+                    add(moves, i, ((isTurnWhite) ? Mask.white_pawn_attack[i] : Mask.black_pawn_attack[i]) & (enemyFiguresMask | pass),pawn+color, promotion);
+                } else if (getBit(ourFigures[knight],i))
+                    add(moves, i, Mask.knight[i] & ~ourFiguresMask & captureMask,knight + color);
+                else if (getBit(ourFigures[king],i)) {
+                    add(moves, i, Mask.king[i] & ~ourFiguresMask & captureMask,king + color);
                     if (isTurnWhite) {
-                        if ((ALL & Mask.castle_white[0]) == 0 && (WHITE_ROOK & 1) != 0 && ((CASTLE >> 3) & 1) != 0)
+                        if (i==3)
+                        if ((all[0] & Mask.castle_white[0]) == 0 && getBit(white[rook],0) && getBit(castle,3) && canCastle(0))
                             moves.add(((193<<4) + 6) << 3);
-                        else if ((ALL & Mask.castle_white[1]) == 0 && ((WHITE_ROOK >> 7) & 1) != 0 && ((CASTLE >> 2) & 1) != 0)
+                        else if ((all[0] & Mask.castle_white[1]) == 0 && getBit(white[rook],7) && getBit(castle,2) && canCastle(1))
                             moves.add(((197<<4) + 6) << 3);
                     } else {
-                        if ((ALL & Mask.castle_black[0]) == 0 && ((BLACK_ROOK >> 56) & 1) != 0 && ((CASTLE >> 1) & 1) != 0)
+                        if (i==59)
+                            if ((all[0] & Mask.castle_black[0]) == 0 && getBit(white[rook],56) && getBit(castle,1) && canCastle(2))
                             moves.add(((3833<<4) + 12) << 3);
-                        else if ((ALL & Mask.castle_black[1]) == 0 && ((BLACK_ROOK >> 63) & 1) != 0 && (CASTLE & 1) != 0)
+                        else if ((all[0] & Mask.castle_black[1]) == 0 && getBit(white[rook],63) && getBit(castle,0) && canCastle(3))
                             moves.add((((3837<<4) + 12) << 3));
                     }
-                } else if (((((isTurnWhite) ? WHITE_ROOK : BLACK_ROOK) >> i) & 1) != 0 || queen) {
+                } else if (getBit(ourFigures[rook],i) || isQueen) {
+                    int figure = ((isQueen) ? queen : rook) + color;
                     int nd = i / 8;
-                    long mask = (ALL >> 8 * nd) & 255;
-                    add(moves, i, Mask.rook_G[i][(int) mask] & ~((isTurnWhite) ? WHITE : BLACK) & ((capture) ? ((isTurnWhite) ? BLACK : WHITE) : -1),((queen) ? 5:2)+((isTurnWhite) ? 0:6));
+                    long mask = (all[0] >> 8 * nd) & 255;
+                    add(moves, i, Mask.rook_G[i][(int) mask] & ~ourFiguresMask & captureMask,figure);
                     nd = 7 - i % 8;
-                    mask = (ALL_ROTATED_90 >> 8 * nd) & 255;
-                    add(moves, i, Mask.rook_V[i][(int) mask] & ~((isTurnWhite) ? WHITE : BLACK) & ((capture) ? ((isTurnWhite) ? BLACK : WHITE) : -1),((queen) ? 5:2)+((isTurnWhite) ? 0:6));
+                    mask = (all[1] >> 8 * nd) & 255;
+                    add(moves, i, Mask.rook_V[i][(int) mask] & ~ourFiguresMask & captureMask,figure);
                 }
-                if (((((isTurnWhite) ? WHITE_BISHOP : BLACK_BISHOP) >> i) & 1) != 0 || queen) {
+                if (getBit(ourFigures[bishop],i) || isQueen) {
+                    int figure = ((isQueen) ? queen : bishop) + color;
                     int nd = i / 8 - i % 8 + 7;
-                    long mask = ALL_ROTATED_45_LEFT >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
-                    add(moves, i, Mask.bishop_L[i][(int) mask] & ~((isTurnWhite) ? WHITE : BLACK) & ((capture) ? ((isTurnWhite) ? BLACK : WHITE) : -1),((queen) ? 5:4)+((isTurnWhite) ? 0:6));
+                    long mask = all[2] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
+                    add(moves, i, Mask.bishop_L[i][(int) mask] & ~ourFiguresMask & captureMask,figure);
                     nd = i / 8 + i % 8;
-                    mask = ALL_ROTATED_45_RIGHT >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
-                    add(moves, i, Mask.bishop_R[i][(int) mask] & ~((isTurnWhite) ? WHITE : BLACK) & ((capture) ? ((isTurnWhite) ? BLACK : WHITE) : -1),((queen) ? 5:4)+((isTurnWhite) ? 0:6));
+                    mask = all[3] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
+                    add(moves, i, Mask.bishop_R[i][(int) mask] & ~ourFiguresMask & captureMask,figure);
                 }
             }
         }
-            return sortMoves(moves, kill);
+            return sortMoves(moves);
     }
 
-    ArrayList<Integer> sortMoves(ArrayList<Integer> moves, int kill[]) {
-        if (kill != null)
-            for (int i = 1; i >= 0; i--)
-                if (moves.contains(kill[i])) {
-                    moves.remove(new Integer(kill[i]));
-                    moves.add(0, kill[i]);
-                }
+    private ArrayList<Integer> sortMoves(ArrayList<Integer> moves) {
 
 
         int[][] k = new int[moves.size()][2];
@@ -268,29 +218,29 @@ public class BitBoard {
         for (int moveNum :
                 moves) {
             int promotion = moveNum & 7;
-           // int figure =  15 & (moveNum >> 3);
-            int move[] = {moveNum>>13,(moveNum>>7) & 63};
+            // int figure =  15 & (moveNum >> 3);
+            int move[] = {moveNum >> 13, (moveNum >> 7) & 63};
             if (promotion != 0) {
                 int cost = 0;
                 if (promotion == 1)
                     cost = Eval.costQueen;
-                if (promotion == 2)
+                else if (promotion == 2)
                     cost = Eval.costRook;
-                if (promotion == 3)
+                else if (promotion == 3)
                     cost = Eval.costKnight;
-                if (promotion == 4)
+                else if (promotion == 4)
                     cost = Eval.costBishop;
-                k[count][0] = 400*cost;
+                k[count][0] = 400 * cost;
                 k[count][1] = count;
                 count++;
                 continue;
             }
-            if (((WHITE_KING >> move[1]) & 1) != 0 || ((BLACK_KING >> move[1]) & 1) != 0) {
+            if (getBit(white[king],move[1]) || getBit(black[king],move[1])) {
                 ArrayList<Integer> list = new ArrayList<>();
                 list.add(moveNum);
                 return list;
             }
-            k[count][0] = 400 * Math.abs(cost(move[1])) - ((cost(move[1]) == 0) ? -1:1)*Math.abs(cost(move[0]));
+            k[count][0] = 400 * Math.abs(cost(move[1])) - ((cost(move[1]) == 0) ? -1 : 1) * Math.abs(cost(move[0]));
             k[count][1] = count;
             count++;
         }
@@ -302,6 +252,14 @@ public class BitBoard {
             sort.add(moves.get(num[1]));
         }
 
+           for (int moveNum :
+                moves)
+            if (lastMove == ((moveNum >> 7) & 63)) {
+                sort.remove(new Integer(moveNum));
+                sort.add(0, moveNum);
+                break;
+            }
+
         int[] hash = AI.history.get(getKey());
 
         if (hash != null)
@@ -312,55 +270,69 @@ public class BitBoard {
                         break;
                     }
 
+
+
         return sort;
     }
 
     int cost(int to) {
-
-        if ((((WHITE_PAWN | WHITE_KNIGHT | WHITE_ROOK | WHITE_BISHOP | WHITE_QUEEN | WHITE_KING | BLACK_PAWN | BLACK_KNIGHT | BLACK_ROOK | BLACK_BISHOP | BLACK_QUEEN | BLACK_KING) >> to) & 1) == 0)
+        if (!getBit(all[0], to))
             return 0;
-        if (((WHITE_PAWN >> to) & 1) != 0)
-            return Eval.costPawn;
-        else if (((WHITE_ROOK >> to) & 1) != 0)
-            return Eval.costRook;
-        else if (((WHITE_BISHOP >> to) & 1) != 0)
-            return Eval.costBishop;
-        else if (((WHITE_KNIGHT >> to) & 1) != 0)
-            return Eval.costKnight;
-        else if (((WHITE_QUEEN >> to) & 1) != 0)
-            return Eval.costQueen;
-        else if (((WHITE_KING >> to) & 1) != 0)
-            return Eval.costKing;
-        else if (((BLACK_PAWN >> to) & 1) != 0)
-            return -Eval.costPawn;
-        else if (((BLACK_ROOK >> to) & 1) != 0)
-            return -Eval.costRook;
-        else if (((BLACK_BISHOP >> to) & 1) != 0)
-            return -Eval.costBishop;
-        else if (((BLACK_KNIGHT >> to) & 1) != 0)
-            return -Eval.costKnight;
-        else if (((BLACK_QUEEN >> to) & 1) != 0)
-            return -Eval.costQueen;
-        else if (((BLACK_KING >> to) & 1) != 0)
-            return -Eval.costKing;
-            return 0;
+        int costs[] = {Eval.costPawn, Eval.costRook, Eval.costKnight, Eval.costBishop, Eval.costQueen, Eval.costKing};
+        for (int i = 0; i < 6; i++)
+            if (getBit(white[i], to))
+                return costs[i];
+            else if (getBit(black[i], to))
+                return -costs[i];
+        return 0;
     }
 
+    private boolean attack_cell(boolean white, int cell){
+        long[] enemyFigures = ((white) ? black : this.white);
+        if ((Mask.knight[cell] & enemyFigures[knight]) != 0)
+            return true;
+        if ((Mask.king[cell] & enemyFigures[king]) != 0)
+            return true;
+        if ((((white) ? (black[pawn] & Mask.white_pawn_attack[cell]) : (this.white[pawn] & Mask.black_pawn_attack[cell]))) != 0)
+            return true;
+
+        long attack;
+        int nd = cell / 8;
+        long mask = (all[0] >> 8 * nd) & 255;
+        attack = Mask.rook_G[cell][(int) mask];
+        nd = 7 - cell % 8;
+        mask = (all[1] >> 8 * nd) & 255;
+        attack |= Mask.rook_V[cell][(int) mask];
+
+        if ((attack & (enemyFigures[rook] | enemyFigures[queen])) != 0)
+            return true;
+
+        nd = cell / 8 - cell % 8 + 7;
+        mask = all[2] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
+        attack = Mask.bishop_L[cell][(int) mask];
+        nd = cell / 8 + cell % 8;
+        mask = all[3] >> ((nd >= 9) ? ((21 - nd) * (nd - 8) / 2 + 36) : (nd * (nd + 1) / 2)) & 255;
+        attack |= Mask.bishop_R[cell][(int) mask];
+
+        return  (attack & (enemyFigures[rook] | enemyFigures[queen])) != 0;
+    }
+
+
+    private static double log2 = Math.log(2);
+
     boolean isCheckTo(boolean white){
-        ArrayList<Integer> move = getMoves(!white,null,true);
-        try {
-            if (white) {
-                if (move.get(0) % 64 == Math.round(Math.log(WHITE_KING) / Mask.log2))
-                    return true;
-            } else {
-                if (move.get(0) % 64 == Math.round(Math.log(BLACK_KING) / Mask.log2))
-                    return true;
-            }
-        }
-        catch (IndexOutOfBoundsException e) {
-            return false;
-        }
-        return false;
+        long king = (white) ? this.white[BitUtils.king] : black[BitUtils.king];
+        return attack_cell(white,(int)Math.round(Math.log(king)/log2));
+    }
+
+    private static int[][] castle_cells = {{1,2,3},{3,4,5},{57,58,59},{59,60,61}};
+
+    private boolean canCastle(int type){
+        boolean white = type <= 1;
+        for (int cell : castle_cells[type])
+            if (attack_cell(white,cell))
+                return false;
+        return true;
     }
 
     boolean isPasteTo(boolean white){
@@ -371,15 +343,15 @@ public class BitBoard {
         return isCheckMateTo(white,false);
     }
 
-    boolean isCheckMateTo(boolean white, boolean paste){
+    private boolean isCheckMateTo(boolean white, boolean paste){
         try {
             if (paste != isCheckTo(white)) {
                 for (int move :
-                        getMoves(white, null)) {
-                    BitBoard bitBoard = Game.makeMove(new BitBoard(this), move);
-                    int move2 = bitBoard.getMoves(!white, null, true).get(0);
+                        getMoves(white)) {
+                    BitBoard bitBoard = Game.makeMove(make_bitboard_from(this), move);
+                    int move2 = bitBoard.getMoves(!white, true).get(0);
                     bitBoard = Game.makeMove(bitBoard, move2);
-                    if (bitBoard.WHITE_KING != 0 && bitBoard.BLACK_KING != 0)
+                    if (bitBoard.white[king] != 0 && bitBoard.black[king] != 0)
                         return false;
                 }
             } else
@@ -392,49 +364,17 @@ public class BitBoard {
     }
 
     int getFigure(int from){
-            if (((WHITE_PAWN >> from) & 1) != 0)
-                return 1;
-
-            if (((WHITE_ROOK >> from) & 1) != 0)
-                return 2;
-
-            if (((WHITE_KNIGHT >> from) & 1) != 0)
-                return 3;
-
-            if (((WHITE_BISHOP >> from) & 1) != 0)
-                return 4;
-
-            if (((WHITE_QUEEN >> from) & 1) != 0)
-                return 5;
-
-            if (((WHITE_KING >> from) & 1) != 0)
-                return 6;
-
-            if (((BLACK_PAWN >> from) & 1) != 0)
-                return 7;
-
-            if (((BLACK_ROOK >> from) & 1) != 0)
-                return 8;
-
-            if (((BLACK_KNIGHT >> from) & 1) != 0)
-                return 9;
-
-            if (((BLACK_BISHOP >> from) & 1) != 0)
-                return 10;
-
-            if (((BLACK_QUEEN >> from) & 1) != 0)
-                return 11;
-
-            if (((BLACK_KING >> from) & 1) != 0)
-                return 12;
+        for (int i = 0; i < 6; i++)
+            if (getBit(white[i],from))
+                return i + 1;
         return 0;
     }
 }
 
 class Mask {
-    static long[] white_pawn_Mask = new long[64];
+    static long[] white_pawn_attack = new long[64];
     static long[] white_pawn_move= new long[64];
-    static long[] black_pawn_Mask= new long[64];
+    static long[] black_pawn_attack= new long[64];
     static long[] black_pawn_move= new long[64];
     static long[] knight= new long[64];
     static long[] king= new long[64];
@@ -444,7 +384,6 @@ class Mask {
     static long[][] rook_V= new long[64][256];
     static long[] castle_white = {0b110,0b1110000};
     static long[] castle_black = new long[2];
-    static double log2 = Math.log(2);
     static long[] cell_default = new long[64];
     static long[] cell_rotated_90 = new long[64];
     static long[] cell_rotated_45_left = new long[64];
@@ -452,13 +391,21 @@ class Mask {
 
     public static void main(String[] args) {
         calculating();
+
+        BitBoard bitBoard = BitBoard.make_bitboard_start();
+        long st = System.currentTimeMillis();
+        for (int i = 0; i < 1000*1000; i++) {
+            bitBoard.getMoves(true);
+        }
+        long secondTime = System.currentTimeMillis() - st;
+        System.out.println("Время на ход: " + secondTime);
     }
 
-    static boolean B(int x, int y) {
+    private static boolean B(int x, int y) {
         return x >= 0 && x <= 7 && y >= 0 && y <= 7;
     }
 
-    static long rotate_90(long mask){
+    private static long rotate_90(long mask){
         long rotate = 0;
         for (int x = 0; x < 8; x++)
             for (int y = 0; y < 8; y++)
@@ -468,7 +415,7 @@ class Mask {
                 return rotate;
     }
 
-    static long rotate_R(long mask){
+    private static long rotate_R(long mask){
         long rotated = 0;
         int n = 0;
         for (int i = 0; i < 8; i++) {
@@ -496,7 +443,7 @@ class Mask {
         return rotated;
     }
 
-    static long rotate_L(long mask){
+    private static long rotate_L(long mask){
         long rotated = 0;
         int n = 0;
         for (int i = 0; i < 8; i++) {
@@ -541,18 +488,18 @@ class Mask {
                             knight[i] |= 1L << (8 * (y + y2) + x + x2);
                 //White_pawn_at
                 if (B(x + 1, y + 1))
-                    white_pawn_Mask[i] |= 1L << (8 * (y + 1) + x + 1);
+                    white_pawn_attack[i] |= 1L << (8 * (y + 1) + x + 1);
                 if (B(x - 1, y + 1))
-                    white_pawn_Mask[i] |= 1L << (8 * (y + 1) + x - 1);
+                    white_pawn_attack[i] |= 1L << (8 * (y + 1) + x - 1);
                 if (B(x, y + 1))
                     white_pawn_move[i] |= 1L << (8 * (y + 1) + x);
                 if (i >= 8 && i <= 15)
                     white_pawn_move[i] |= 1L << (i + 8 * 2);
                 //black pawn
                 if (B(x + 1, y - 1))
-                    black_pawn_Mask[i] |= 1L << (8 * (y - 1) + x + 1);
+                    black_pawn_attack[i] |= 1L << (8 * (y - 1) + x + 1);
                 if (B(x - 1, y - 1))
-                    black_pawn_Mask[i] |= 1L << (8 * (y - 1) + x - 1);
+                    black_pawn_attack[i] |= 1L << (8 * (y - 1) + x - 1);
                 if (B(x, y - 1))
                     black_pawn_move[i] |= 1L << (8 * (y - 1) + x);
                 if (i >= 48 && i <= 55)
@@ -632,7 +579,7 @@ class Mask {
         for (int i2 = 0; i2 < 8; i2++) {
             int m = 0;
             for (int j = 7 - i2; j <= 7; j++){
-                cell_rotated_45_left[n] |= 1L << j + 8*m;
+                cell_rotated_45_left[j + 8*m] |= 1L << n;
                 m++;
                 n++;
             }
@@ -641,7 +588,7 @@ class Mask {
             int m = 0;
             for (int j = 7 - i2; j <= 7; j++){
                 if (j+8*m>-1 && j+8*m<64 && (j+8*m)/8>(j+8*m)%8) {
-                    cell_rotated_45_left[n] |= 1L << j + 8*m;
+                    cell_rotated_45_left[j + 8*m] |= 1L << n;
                     n++;
                 }
                 m++;
@@ -653,7 +600,7 @@ class Mask {
         for (int i2 = 0; i2 < 8; i2++) {
             int m = 8*i2;
             for (int j = 0; j <= i2; j++){
-                cell_rotated_45_right[n] |= 1L << j + m;
+                cell_rotated_45_right[j + m] |= 1L << n;
                 m-=8;
                 n++;
             }
@@ -662,7 +609,7 @@ class Mask {
             int m = 8*i2;
             for (int j = 0; j <= i2; j++){
                 if (j+m>-1 && j+m<64 && (j+m)/8+(j+m)%8>7) {
-                    cell_rotated_45_right[n] |= 1L << j + m;
+                    cell_rotated_45_right[j + m] |= 1L << n;
                     n++;
                     if (j+m == 63)
                         break label;

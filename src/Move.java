@@ -1,3 +1,5 @@
+import Util.BitUtils;
+
 import javax.sound.sampled.*;
 import javax.swing.*;
 import java.io.File;
@@ -16,12 +18,12 @@ class Move {
             if (from == null)
                 from = i;
             else {
-                if (bitBoard.getFigure(from) == 1 && from/8==6 && i/8==7 && Game.makeLegalMove(new BitBoard(bitBoard),((((((from << 6) + i) << 4) + bitBoard.getFigure(from)) << 3) + 1))) {
+                if (bitBoard.getFigure(from) == 1 && from/8==6 && i/8==7 && Game.makeLegalMove(BitBoard.make_bitboard_from(bitBoard),move_init(from,i,bitBoard.getFigure(from),1))) {
                     to = i;
                     new Chose().setVisible(true);
                 }
-                else if (Game.makeLegalMove(new BitBoard(bitBoard),(((((from << 6) + i) << 4) + bitBoard.getFigure(from)) << 3))) {
-                    move = (((((from << 6) + i) << 4) + bitBoard.getFigure(from)) << 3);
+                else if (Game.makeLegalMove(BitBoard.make_bitboard_from(bitBoard),move_init(from,i,bitBoard.getFigure(from),0))) {
+                    move = move_init(from,i,bitBoard.getFigure(from),0);
                     clear();
                     block =true;
                 }
@@ -36,42 +38,31 @@ class Move {
         to = null;
     }
 
-    static void updatePosition(){
-        String color;
-            for (int i = 0; i < 64; i++) {
-                if ((i/8 + i%8) % 2 == 0)
-                    color = "_W";
-                else
-                    color = "_B";
-               if (((bitBoard.WHITE_PAWN >> i) & 1) != 0)
-                   buttons[i].setIcon(new ImageIcon("Icons/WP"+color+".png"));
-               else if (((bitBoard.WHITE_ROOK >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/WR"+color+".png"));
-               else if (((bitBoard.WHITE_BISHOP >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/WB"+color+".png"));
-               else if (((bitBoard.WHITE_KNIGHT >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/WN"+color+".png"));
-               else if (((bitBoard.WHITE_QUEEN >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/WQ"+color+".png"));
-               else if (((bitBoard.WHITE_KING >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/WK"+color+".png"));
+    private static int move_init(int from, int to, int figure, int promotion){
+        return (((((from << 6) + to) << 4) + figure) << 3) + promotion;
+    }
 
-               else if (((bitBoard.BLACK_PAWN >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/BP"+color+".png"));
-               else if (((bitBoard.BLACK_ROOK >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/BR"+color+".png"));
-               else if (((bitBoard.BLACK_BISHOP >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/BB"+color+".png"));
-               else if (((bitBoard.BLACK_KNIGHT >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/BN"+color+".png"));
-               else if (((bitBoard.BLACK_QUEEN >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/BQ"+color+".png"));
-               else if (((bitBoard.BLACK_KING >> i) & 1) != 0)
-                    buttons[i].setIcon(new ImageIcon("Icons/BK"+color+".png"));
-               else
-                   buttons[i].setIcon(new ImageIcon("Icons/"+color+".png"));
+    static void updatePosition() {
+        String color;
+        for (int i = 0; i < 64; i++) {
+            if ((i / 8 + i % 8) % 2 == 0)
+                color = "_W";
+            else
+                color = "_B";
+            String[] symbols = {"P", "R", "N", "B", "Q", "K"};
+            for (int j = 0; j < 6; j++) {
+                if (BitUtils.getBit(bitBoard.white[j], i)) {
+                    buttons[i].setIcon(new ImageIcon("Icons/W" + symbols[j] + color + ".png"));
+                    break;
                 }
+                else if (BitUtils.getBit(bitBoard.black[j], i)) {
+                    buttons[i].setIcon(new ImageIcon("Icons/B" + symbols[j] + color + ".png"));
+                    break;
+                }
+                    buttons[i].setIcon(new ImageIcon("Icons/" + color + ".png"));
             }
+        }
+    }
 
     static void sounds(String sound){
         try {
